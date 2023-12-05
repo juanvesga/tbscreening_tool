@@ -1,0 +1,117 @@
+---
+title: "LTBI Testing and treatment cost-effectiveness"
+output: pdf_document
+params:
+    data: object
+date: "2023-11-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+## About this report
+
+This report have been produced with the **LTBI CEA tool** available at XXXXXXXXX.
+
+## Input data for this analysis
+
+```{r include=FALSE, verbose =FALSE}
+
+input<-data.frame(
+  Input=c("Cohort size","Time horizon (years)","Willingness to pay (£)"),
+  Value = c(params$data$cohort_size, params$data$time_horizon, params$data$will_to_pay)
+)
+
+```   
+
+```{r echo=FALSE , verbose =FALSE}
+library(kableExtra)
+library(knitr)
+kable(input,"simple")
+
+```
+
+
+## ICER plane
+
+```{r echo=FALSE , verbose =FALSE}
+obj<-params$data
+bceares<- obj$bcea_tb
+will_to_pay=obj$will_to_pay
+icercol<-"#FF3333"
+
+p<-ceplane.plot(
+  bceares, 
+  wtp = will_to_pay,
+  graph="ggplot2",
+  title= "",
+  line = list(color = "grey40"),
+  point = list(color = "blue"),
+  icer = list(color = icercol, size = 3),
+  area = list(fill = "lightcyan"),
+  theme = theme_minimal(),
+  opt.theme=ggplot2::theme(text=ggplot2::element_text(size=12))
+  ) 
+  
+
+
+
+gridExtra::grid.arrange(p)
+```     
+
+## Cost-effectiveness thresholds at £20k and £30k per QALY
+
+```{r echo=FALSE , verbose =FALSE}
+obj<-params$data
+bceares<- obj$bcea_tb
+icers<- bceares$delta_c/bceares$delta_e
+val1<-length(which(icers<20000))/dim(icers)[1] 
+val2<-length(which(icers<30000))/dim(icers)[1]
+
+df<-data.frame(
+  pos = c(1 ,3),
+  val = c(val1*1e2,val2*1e2),
+  cat = c("£20k","£30k")
+)
+
+p<-ggplot(df, aes(x=cat, y=val))+
+  geom_bar(stat="identity", fill=c('firebrick',"darkgreen"),  alpha=0.35)+
+  ylim(c(0,100))+
+  geom_segment(aes(x = 0.75, y = 50, xend = 1.25, yend = 50), size=1,linetype='dotted', col = 'firebrick')+
+  geom_segment(aes(x = 1.75, y = 90, xend = 2.25, yend = 90),size=1,linetype='dotted', col = 'darkgreen')+
+  labs(
+    title = " "
+  )+
+  xlab(" ")+
+  ylab("Simulations under specific WTP (%)")+
+  theme_minimal()+
+  theme(
+    text = element_text(size=12),
+    axis.text.x = element_text(angle=60, hjust=1))
+
+
+gridExtra::grid.arrange(p)  
+``` 
+
+
+## Cost-effectiveness acceptibility 
+
+```{r echo=FALSE , verbose =FALSE}
+obj<-params$data
+bceares<- obj$bcea_tb
+will_to_pay=obj$will_to_pay
+icercol<-"#FF3333"
+
+p<-ceac.plot(
+  bceares, 
+  graph="ggplot2",
+  title= "",
+  line = list(color = "blue"),
+  icer = list(color = icercol, size = 3),
+  theme = theme_minimal(),
+  opt.theme=ggplot2::theme(text=ggplot2::element_text(size=12))
+  ) 
+ 
+gridExtra::grid.arrange(p) 
+``` 
