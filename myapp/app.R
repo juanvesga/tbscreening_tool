@@ -30,8 +30,8 @@ library(BCEA)
 library(ggplot2)
 library(purrr)
 
-path_app<-rstudioapi::getSourceEditorContext()$path
-setwd(gsub('/app.R','', path_app))
+# path_app<-rstudioapi::getSourceEditorContext()$path
+# setwd(gsub('/app.R','', path_app))
 
 source("Categorical.R")
 source("rpert.R")
