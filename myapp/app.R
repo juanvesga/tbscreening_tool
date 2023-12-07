@@ -83,7 +83,7 @@ time_horizon<-20
 ## Costs
 tpt_cost <- 100  # once
 test_cost <- 50 # once
-tbtx_cost_yr <- 100 ## per year
+tbtx_cost_yr <- 6000 ## per year
 
 
 ## QoL from Kind eta l 1999
@@ -390,7 +390,7 @@ ui <- dashboardPage(
                 box(
                   title = "Proportion of TPT regimen cost incurred by those lost to follow-up (%) ",
                   status = "primary", solidHeader = TRUE,
-                  sliderInput("cost_ltfup", "(%)", 0, 100, 0),
+                  sliderInput("cost_ltfup", "(%)", 0, 100, 0.5),
                 ),
               ),
               
@@ -1891,9 +1891,12 @@ server <- function(input, output,session) {
     deaths_itv<-rbinom(sim_cases_itv,sim_cases,cfr)
     
     # QALY
-
-    sim_healthy_qaly<-sim_cases*0 + cohort_size * time_horizon
-    sim_healthy_qaly_itv<-sim_cases_itv*0 + cohort_size * time_horizon
+    age<-dfage()
+    dfqol<-dffullqol()
+    healthy<-sum(((age$value)/100)*(dfqol$value))
+    
+    sim_healthy_qaly<-sim_cases*0 + healthy*cohort_size * time_horizon
+    sim_healthy_qaly_itv<-sim_cases_itv*0 + healthy*cohort_size * time_horizon
     
     sim_tb_qaly <- sim_cases*(1- frac_eptb) * sim_tb_qol * av_tbdur
     sim_eptb_qaly <- sim_cases*(frac_eptb) * sim_eptb_qol * av_tbdur
@@ -1906,7 +1909,7 @@ server <- function(input, output,session) {
     
     qaly<- sim_healthy_qaly - sim_tb_qaly - sim_eptb_qaly - sim_post_qaly - deaths
     qaly_itv<- sim_healthy_qaly_itv - sim_tb_qaly_itv - sim_eptb_qaly_itv - sim_post_qaly_itv - deaths_itv
-    
+  
     
     # Costs
     start_cost<- sim_test_cost*cohort_size + npositives*sim_tpt_cost + sim_camp_cost
