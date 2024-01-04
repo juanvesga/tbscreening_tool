@@ -51,6 +51,7 @@ country_tb_inc <- read.csv("TB_burden_countries_2020-08-14.csv")
 country_tb_inc <- country_tb_inc %>% select(country, year, e_inc_100k) %>% 
   rename(country_of_birth=country, year_of_entry=year)
 
+setosa <- filter(iris, Species == "setosa")
 
 
 
@@ -115,6 +116,10 @@ ui <- dashboardPage(
                menuSubItem("Costs", tabName = "res_costs"),
                menuSubItem("ICER", tabName = "res_icer")
       ),
+      menuItem("Sensitivity Analysis", icon = icon("bar-chart"), startExpanded = TRUE,
+               menuSubItem("Scenarios", tabName = "scen"),
+               menuSubItem("Comparison", tabName = "comp")
+      ),
       menuItem("About", tabName = "about", icon = icon("th"))
     )
   ),
@@ -151,7 +156,14 @@ ui <- dashboardPage(
                 
                 p("7) Run CEA analsys using the run button in the ICER panel. 
                   Here you can download a report of your scenario",
-                  style = "font-size:18px")
+                  style = "font-size:18px"),
+                
+                p("INPUT PARAMETERS FROM .CSV: Saved scenario parameters can be 
+                uploaded again with the button below. Select a file to upload and 
+                go straight to the ICER panel",
+                  style = "font-size:18px"),
+                
+                fileInput("upload", "Upload scenario parameters")
               )
       ),
       
@@ -578,8 +590,8 @@ ui <- dashboardPage(
                   sliderInput("will_to_pay", "Wilingness to pay (£)", 5000, 50000, 20000)
                 ),
                 actionButton("add","Run"),
-                downloadButton("btn", "Generate Report")
-                
+                downloadButton("btn", "Generate Report"),
+                downloadButton("btncsv", "Download scenario parameters (.csv)")
               ),
               fluidRow(
                 box(
@@ -590,6 +602,22 @@ ui <- dashboardPage(
                 )
               )
       ),
+      
+      # 8 Sensitivity analysis: scenarios
+      tabItem(tabName = "scen",
+              
+              fluidRow(
+                column(12,
+                       tableOutput('table_params')
+                )
+              )
+              
+              
+
+      ),
+      
+      
+      
       # 5 About tab
       tabItem(tabName = "about",
               fluidPage(
@@ -1640,6 +1668,9 @@ server <- function(input, output,session) {
       beta <- alpha * (1 / mu - 1)
       return(params = list(alpha = alpha, beta = beta))
     }
+    
+      
+    
     tpt_eff<-0
     if (input$tpt == "6INH"){
       tpt_eff <- 0.6  
@@ -1660,19 +1691,40 @@ server <- function(input, output,session) {
     
     n<-1000
     # Campaign
-    if (input$campcost_dist =="Gamma"){
+    cost_camp<- 0
+    cost_campsd<-  0 
+    cost_campmin<-  0
+    cost_campmax<-  0
+    cost_campshape<-  0
+    
+      if (input$campcost_dist =="Gamma"){
+        cost_camp<- input$cost_camp_gamma
+        cost_campsd<-  input$cost_campsd_gamma#(xmax-xmin)/3.92 
+        cost_campmin<-  NA
+        cost_campmax<-  NA
+        cost_campshape<-  NA
+        
       xmean<-input$cost_camp_gamma
       sd<- input$cost_campsd_gamma#(xmax-xmin)/3.92 
       shape<- (xmean^2)/(sd^2)
       sim_camp_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
       
     } else if (input$campcost_dist =="PERT"){
+
+      cost_campsd<-  NA 
+      cost_camp<-  input$cost_camp_pert
+      cost_campmin<-  input$cost_campmin_pert
+      cost_campmax<-  input$cost_campmax_pert
+      cost_campshape<-  input$cost_camplam
+      
       xmean<-input$cost_camp_pert
       xmin<-input$cost_campmin_pert
       xmax<-input$cost_campmax_pert
       lam<- input$cost_camplam
       sim_camp_cost<-rpert(n,xmin,xmax,xmean,lam)
     }
+    
+    #campaing
     
     
     # 
@@ -1682,8 +1734,19 @@ server <- function(input, output,session) {
     
     
     ## test
-    
+    cost_test<- 0
+    cost_testsd<-  0 
+    cost_testmin<-  0
+    cost_testmax<-  0
+    cost_testshape<-  0
     if (input$testcost_dist =="Gamma"){
+      
+      cost_test<- input$cost_test_gamma
+      cost_testsd<-  input$cost_testsd_gamma
+      cost_testmin<-  NA
+      cost_testmax<-  NA
+      cost_testshape<-  NA
+      
       xmean<-input$cost_test_gamma
       #xmin<-input$cost_testmin_gamma
       #xmax<-input$cost_testmax_gamma
@@ -1692,6 +1755,13 @@ server <- function(input, output,session) {
       sim_test_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
       
     } else if (input$testcost_dist =="PERT"){
+      
+      cost_test<-input$cost_test_pert
+      cost_testsd<-  NA 
+      cost_testmin<-  input$cost_testmin_pert
+      cost_testmax<-  input$cost_testmax_pert
+      cost_testshape<-  input$cost_testlam
+      
       xmean<-input$cost_test_pert
       xmin<-input$cost_testmin_pert
       xmax<-input$cost_testmax_pert
@@ -1712,7 +1782,17 @@ server <- function(input, output,session) {
     
     
     ## TPT cost
+    cost_tpt<- 0
+    cost_tptsd<-  0 
+    cost_tptmin<-  0
+    cost_tptmax<-  0
+    cost_tptshape<-  0
     if (input$tptcost_dist =="Gamma"){
+      cost_tpt<- input$cost_tpt_gamma
+      cost_tptsd<-  input$cost_tptsd_gamma 
+      cost_tptmin<-  NA
+      cost_tptmax<-  NA
+      cost_tptshape<-  NA
       xmean<-input$cost_tpt_gamma
       # xmin<-input$cost_tptmin_gamma
       # xmax<-input$cost_tptmax_gamma
@@ -1721,7 +1801,11 @@ server <- function(input, output,session) {
       sim_tpt_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
       
     } else if (input$tptcost_dist =="PERT"){
-      
+      cost_tpt<- input$cost_tpt_pert
+      cost_tptsd<-  NA 
+      cost_tptmin<- input$cost_tptmin_pert 
+      cost_tptmax<-  input$cost_tptmax_pert
+      cost_tptshape<-  input$cost_tptlam
       xmean<-input$cost_tpt_pert
       xmin<-input$cost_tptmin_pert
       xmax<-input$cost_tptmax_pert
@@ -1746,8 +1830,17 @@ server <- function(input, output,session) {
     frac_post<-0.25
     
     # TB QOL
+    qol_tb<- 0
+    qol_tbsd<-  0 
+    qol_tbmin<-  0
+    qol_tbmax<-  0
+    qol_tbshape<-  0
     if (input$ptbqol_dist =="Beta"){
-      
+      qol_tb<- input$qol_ptb_beta
+      qol_tbsd<-  input$qol_ptbsd_beta 
+      qol_tbmin<-  NA
+      qol_tbmax<-  NA
+      qol_tbshape<-  NA
       xmean<-input$qol_ptb_beta
       # xmin<-input$qol_ptbmin_beta
       # xmax<-input$qol_ptbmax_beta
@@ -1756,7 +1849,11 @@ server <- function(input, output,session) {
       sim_tb_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
       
     } else if (input$ptbqol_dist =="PERT"){
-      
+      qol_tb<- input$qol_ptb_pert
+      qol_tbsd<-  NA 
+      qol_tbmin<-  input$qol_ptbmin_pert
+      qol_tbmax<-  input$qol_ptbmax_pert
+      qol_tbshape<- input$qol_ptblam_pert
       xmean<-input$qol_ptb_pert
       xmin<-input$qol_ptbmin_pert
       xmax<-input$qol_ptbmax_pert
@@ -1778,8 +1875,17 @@ server <- function(input, output,session) {
     
     
     #EPTB QoL
+    qol_eptb<- 0
+    qol_eptbsd<-  0 
+    qol_eptbmin<-  0
+    qol_eptbmax<-  0
+    qol_eptbshape<-  0
     if (input$eptbqol_dist =="Beta"){
-      
+      qol_eptb<- input$qol_eptb_beta
+      qol_eptbsd<- input$qol_eptbsd_beta
+      qol_eptbmin<-  NA
+      qol_eptbmax<-  NA
+      qol_eptbshape<- NA
       xmean<-input$qol_eptb_beta
       # xmin<-input$qol_eptbmin_beta
       # xmax<-input$qol_eptbmax_beta
@@ -1788,7 +1894,11 @@ server <- function(input, output,session) {
       sim_eptb_qol  <- rbeta(n,pars_beta$alpha, pars_beta$beta)
       
     } else if (input$eptbqol_dist =="PERT"){
-      
+      qol_eptb<- input$qol_eptb_pert
+      qol_eptbsd<-  NA 
+      qol_eptbmin<-  input$qol_eptbmin_pert
+      qol_eptbmax<-  input$qol_eptbmax_pert
+      qol_eptbshape<- input$qol_eptblam_pert
       xmean<-input$qol_eptb_pert
       xmin<-input$qol_eptbmin_pert
       xmax<-input$qol_eptbmax_pert
@@ -1808,8 +1918,17 @@ server <- function(input, output,session) {
     # sim_eptb_qol  <- rpert(n_samples,eptb_qolmin,eptb_qolmax,eptb_qol)
     
     # POstTB QoL
+    qol_postb<- 0
+    qol_postbsd<-  0 
+    qol_postbmin<-  0
+    qol_postbmax<-  0
+    qol_postbshape<-  0
     if (input$postqol_dist =="Beta"){
-      
+      qol_postb<- input$qol_post_beta
+      qol_postbsd<-  input$qol_postsd_beta 
+      qol_postbmin<-  NA
+      qol_postbmax<-  NA
+      qol_postbshape<-  NA
       xmean<-input$qol_post_beta
       # xmin<-input$qol_postmin_beta
       # xmax<-input$qol_postmax_beta
@@ -1818,7 +1937,11 @@ server <- function(input, output,session) {
       sim_post_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
       
     } else if (input$postqol_dist =="PERT"){
-      
+      qol_postb<- input$qol_post_pert
+      qol_postbsd<-  NA 
+      qol_postbmin<-  input$qol_postmin_pert
+      qol_postbmax<-  input$qol_postmax_pert
+      qol_postbshape<-  input$qol_postlam_pert
       xmean<-input$qol_post_pert
       xmin<-input$qol_postmin_pert
       xmax<-input$qol_postmax_pert
@@ -1855,6 +1978,89 @@ server <- function(input, output,session) {
       sim_ae_qol<-rpert(n,xmin,xmax,xmean,lam)
       
     }
+
+    # Table of inputs
+    Table_input <- data.frame(
+      Parameter = c("Cohort size", 
+                    "Time horizon", 
+                    "Willingness to pay",
+                    "TPT",
+                    "TPT effectiveness",
+                    "Cost of campaign",
+                    "Cost of campaign SD (Gamma)",
+                    "Cost of campaign min (PERT)",
+                    "Cost of campaign max (PERT)",
+                    "Cost of campaign shape (PERT)",
+                    "Cost of TBI test",
+                    "Cost of TBI test SD (Gamma)",
+                    "Cost of TBI test min (PERT)",
+                    "Cost of TBI test max (PERT)",
+                    "Cost of TBI test shape (PERT)",
+                    "Cost of TPT",
+                    "Cost of TPT SD (Gamma)",
+                    "Cost of TPT min (PERT)",
+                    "Cost of TPT max (PERT)",
+                    "Cost of TPT shape (PERT)",
+                    "QoL of TB disease",
+                    "QoL of TB disease SD (Gamma)",
+                    "QoL of TB disease min (PERT)",
+                    "QoL of TB disease max (PERT)",
+                    "QoL of TB disease shape (PERT)",
+                    "QoL of EPTB disease",
+                    "QoL of EPTB disease SD (Gamma)",
+                    "QoL of EPTB disease min (PERT)",
+                    "QoL of EPTB disease max (PERT)",
+                    "QoL of EPTB disease shape (PERT)",
+                    "QoL of Post-TB disease",
+                    "QoL of Post-TB disease SD (Gamma)",
+                    "QoL of Post-TB disease min (PERT)",
+                    "QoL of Post-TB disease max (PERT)",
+                    "QoL of Post-TB disease shape (PERT)"
+                    
+                    ),
+          Current_scenario =c( input$n, 
+                    input$t_hor, 
+                    input$will_to_pay,
+                    input$tpt,
+                    tpt_eff,
+                    cost_camp,
+                    cost_campsd,
+                    cost_campmin,
+                    cost_campmax,
+                    cost_campshape,
+                    cost_test,
+                    cost_testsd, 
+                    cost_testmin,
+                    cost_testmax,
+                    cost_testshape,
+                    cost_tpt,
+                    cost_tptsd, 
+                    cost_tptmin,
+                    cost_tptmax,
+                    cost_tptshape,
+                    qol_tb,
+                    qol_tbsd, 
+                    qol_tbmin,
+                    qol_tbmax,
+                    qol_tbshape,
+                    qol_eptb,
+                    qol_eptbsd, 
+                    qol_eptbmin,
+                    qol_eptbmax,
+                    qol_eptbshape,
+                    qol_postb,
+                    qol_postbsd, 
+                    qol_postbmin,
+                    qol_postbmax,
+                    qol_postbshape
+                    
+                    
+                    )
+    )
+    
+    cohort_size<-input$n
+    time_horizon<-input$t_hor
+    will_to_pay=input$will_to_pay
     
     
     #Define variables
@@ -1929,7 +2135,8 @@ server <- function(input, output,session) {
       treats=treats,
       eff=eff,
       cost=cost,
-      bcea_tb=bcea(eff,cost, ref=2,interventions=treats)
+      bcea_tb=bcea(eff,cost, ref=2,interventions=treats),
+      table=Table_input
     )
     
     return(out)
@@ -2050,6 +2257,21 @@ server <- function(input, output,session) {
       gridExtra::grid.arrange(p)  
       
     })
+
+    ## Download CSV
+    output$table <- renderTable({
+      dfage()
+    })
+    
+    output$btndcsv <-
+      downloadHandler(
+        filename = function () {
+          paste("parameters.csv", sep = "")
+        },
+        content = function(file) {
+          write.csv(dfage(), file)
+        }
+      )
     
     ## Produce report
     
@@ -2069,6 +2291,12 @@ server <- function(input, output,session) {
       }
     )
     
+    ########### Scenarios 
+    
+    # Table_params
+    output$table_params <- renderTable({
+      icer_object()$table
+    })
     
     
   })
