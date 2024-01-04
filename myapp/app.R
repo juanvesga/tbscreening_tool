@@ -100,32 +100,70 @@ X <- Categorical(rownames(age_uk), p = age_uk/100)
 
 # Define UI for application that draws a histogram
 ui <- dashboardPage(
-  dashboardHeader(title = "LTBI CEA Tool"),
+  dashboardHeader(title = "LTBI CEA Tool", tags$li(class = "dropdown", actionButton("home", "Home"))),
   ## Sidebar content
   dashboardSidebar(
-    sidebarMenu(
-      menuItem("How to use the tool", tabName = "how", icon = icon("check")),
-      menuItem("Demographics", tabName = "epi", icon = icon("bar-chart")),
-      menuItem("LTBI tests", tabName = "ltbi", icon = icon("vial")),
-      menuItem("LTBI cascade", tabName = "cascade", icon = icon("chart-simple")),
-      menuItem("Costs", tabName = "cost", icon = icon("sterling-sign")),
-      menuItem("Quality of Life", tabName = "qol", icon = icon("staff-snake")),
-      sliderInput("t_hor", "Time-horizon (years)", 2, 50, 5),
-      menuItem("Results", icon = icon("bar-chart"), startExpanded = TRUE,
-               menuSubItem("TB Incidence", tabName = "res_inc"),
-               menuSubItem("Costs", tabName = "res_costs"),
-               menuSubItem("ICER", tabName = "res_icer")
-      ),
-      menuItem("Sensitivity Analysis", icon = icon("bar-chart"), startExpanded = TRUE,
-               menuSubItem("Scenarios", tabName = "scen"),
-               menuSubItem("Comparison", tabName = "comp")
-      ),
-      menuItem("About", tabName = "about", icon = icon("th"))
+    sidebarMenu(id = "sidebar",
+                menuItem("Home", tabName = "home", icon = icon("house")),
+                menuItem("Single Run", tabName = "single", icon = icon("bar-chart"), startExpanded = TRUE,
+                         menuSubItem("How to...", tabName = "how", icon = icon("check")),
+                         menuSubItem("Demographics", tabName = "epi", icon = icon("bar-chart")),
+                         menuSubItem("LTBI tests", tabName = "ltbi", icon = icon("vial")),
+                         menuSubItem("LTBI cascade", tabName = "cascade", icon = icon("chart-simple")),
+                         menuSubItem("Costs", tabName = "cost", icon = icon("sterling-sign")),
+                         menuSubItem("Quality of Life", tabName = "qol", icon = icon("staff-snake")),
+                         menuSubItem("TB Incidence", tabName = "res_inc"),
+                         menuSubItem("Costs", tabName = "res_costs"),
+                         menuSubItem("ICER", tabName = "res_icer")
+                ),
+                menuItem("Scenarios", icon = icon("bar-chart"), startExpanded = TRUE,
+                         menuSubItem("How to...", tabName = "how_scen"),
+                         menuSubItem("Comparison", tabName = "comp")
+                ),
+                menuItem("Advanced", icon = icon("bar-chart"), startExpanded = TRUE,
+                         menuSubItem("How to...", tabName = "how_adv"),
+                         menuSubItem("Batch", tabName = "batch")
+                ),
+                menuItem("About", tabName = "about", icon = icon("th"))
     )
   ),
   ## Body content
   dashboardBody(
     tabItems(
+      # Home
+      tabItem(tabName = "home",
+              fluidRow(
+                box(
+                  title = "Single Run",
+                  p("Define a cohort, input costs and epidemiological parameters and run a single scenario CEA"),
+                ),
+                box(
+                  tags$li( actionButton("single", "Single run", class = "btn-primary"))
+                ),
+              ),
+              
+              fluidRow(
+                box(
+                  title = "Scenarios",
+                  p("Upload selected scenarios and compare"),
+                ),
+                box(
+                  tags$li(actionButton("scenarios", "Scenarios", class = "btn-success"))
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "Advanced",
+                  p("Use a batch file to run multiple scenarios and download numeric results as .csv")
+                ),
+                box(
+                  tags$li( actionButton("advanced", "Advanced", class = "btn-warning"))
+                )
+              )
+      ),
+      
+      
+      
       # 5 About tab
       tabItem(tabName = "how",
               fluidPage(
@@ -147,6 +185,8 @@ ui <- dashboardPage(
                   define the shape of the background distributions for these inputs",style = "font-size:18px"),
                 
                 p("5) Choose your time-horizon for analysis",style = "font-size:18px"),
+                
+                sliderInput("t_hor", "Time-horizon (years)", 2, 50, 5),
                 
                 p("6) Explore costs and epidemilogical estimates in the",
                   span(tags$a("Results Tab", onclick="Shiny.onInputChange('tab', 'epi')"),
@@ -603,17 +643,26 @@ ui <- dashboardPage(
               )
       ),
       
-      # 8 Sensitivity analysis: scenarios
-      tabItem(tabName = "scen",
-              
-              fluidRow(
-                column(12,
-                       tableOutput('table_params')
-                )
+      # How scenarios
+      tabItem(tabName = "how_scen",
+              fluidPage(
+                p("INPUT PARAMETERS FROM .CSV: Saved scenario parameters can be 
+                uploaded again with the button below. Select a file to upload and 
+                go straight to the ICER panel",
+                  style = "font-size:18px"),
+                
+                fileInput("upload", "Upload scenario parameters")
               )
-              
-              
-
+      ),
+      tabItem(tabName = "how_adv",
+              fluidPage(
+                p("INPUT PARAMETERS FROM .CSV: Saved scenario parameters can be 
+                uploaded again with the button below. Select a file to upload and 
+                go straight to the ICER panel",
+                  style = "font-size:18px"),
+                
+                fileInput("upload", "Upload scenario parameters")
+              )
       ),
       
       
@@ -664,6 +713,26 @@ ui <- dashboardPage(
 
 ###################################################################################
 server <- function(input, output,session) {
+  
+  # Home button tag
+  observeEvent(input$home, {
+    updateTabItems(session, "sidebar", "home")
+  })
+  
+  # Single run button tag
+  observeEvent(input$single, {
+    updateTabItems(session, "sidebar", "how")
+  })
+  
+  # Compare button tag
+  observeEvent(input$compare, {
+    updateTabItems(session, "sidebar", "how_scen")
+  })
+  
+  # Compare button tag
+  observeEvent(input$advanced, {
+    updateTabItems(session, "sidebar", "how_adv")
+  })
   
   ## Epidemiology Tab
   
@@ -1182,7 +1251,7 @@ server <- function(input, output,session) {
       x <- rbeta(n,pars_beta$alpha, pars_beta$beta)
       
     } else if (input$aeqol_dist =="PERT"){
-   
+      
       xmean<-input$qol_ae_pert
       xmin<-input$qol_aemin_pert
       xmax<-input$qol_aemax_pert
@@ -1669,7 +1738,7 @@ server <- function(input, output,session) {
       return(params = list(alpha = alpha, beta = beta))
     }
     
-      
+    
     
     tpt_eff<-0
     if (input$tpt == "6INH"){
@@ -1697,20 +1766,20 @@ server <- function(input, output,session) {
     cost_campmax<-  0
     cost_campshape<-  0
     
-      if (input$campcost_dist =="Gamma"){
-        cost_camp<- input$cost_camp_gamma
-        cost_campsd<-  input$cost_campsd_gamma#(xmax-xmin)/3.92 
-        cost_campmin<-  NA
-        cost_campmax<-  NA
-        cost_campshape<-  NA
-        
+    if (input$campcost_dist =="Gamma"){
+      cost_camp<- input$cost_camp_gamma
+      cost_campsd<-  input$cost_campsd_gamma#(xmax-xmin)/3.92 
+      cost_campmin<-  NA
+      cost_campmax<-  NA
+      cost_campshape<-  NA
+      
       xmean<-input$cost_camp_gamma
       sd<- input$cost_campsd_gamma#(xmax-xmin)/3.92 
       shape<- (xmean^2)/(sd^2)
       sim_camp_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
       
     } else if (input$campcost_dist =="PERT"){
-
+      
       cost_campsd<-  NA 
       cost_camp<-  input$cost_camp_pert
       cost_campmin<-  input$cost_campmin_pert
@@ -1978,7 +2047,7 @@ server <- function(input, output,session) {
       sim_ae_qol<-rpert(n,xmin,xmax,xmean,lam)
       
     }
-
+    
     # Table of inputs
     Table_input <- data.frame(
       Parameter = c("Cohort size", 
@@ -2017,45 +2086,45 @@ server <- function(input, output,session) {
                     "QoL of Post-TB disease max (PERT)",
                     "QoL of Post-TB disease shape (PERT)"
                     
-                    ),
-          Current_scenario =c( input$n, 
-                    input$t_hor, 
-                    input$will_to_pay,
-                    input$tpt,
-                    tpt_eff,
-                    cost_camp,
-                    cost_campsd,
-                    cost_campmin,
-                    cost_campmax,
-                    cost_campshape,
-                    cost_test,
-                    cost_testsd, 
-                    cost_testmin,
-                    cost_testmax,
-                    cost_testshape,
-                    cost_tpt,
-                    cost_tptsd, 
-                    cost_tptmin,
-                    cost_tptmax,
-                    cost_tptshape,
-                    qol_tb,
-                    qol_tbsd, 
-                    qol_tbmin,
-                    qol_tbmax,
-                    qol_tbshape,
-                    qol_eptb,
-                    qol_eptbsd, 
-                    qol_eptbmin,
-                    qol_eptbmax,
-                    qol_eptbshape,
-                    qol_postb,
-                    qol_postbsd, 
-                    qol_postbmin,
-                    qol_postbmax,
-                    qol_postbshape
-                    
-                    
-                    )
+      ),
+      Current_scenario =c( input$n, 
+                           input$t_hor, 
+                           input$will_to_pay,
+                           input$tpt,
+                           tpt_eff,
+                           cost_camp,
+                           cost_campsd,
+                           cost_campmin,
+                           cost_campmax,
+                           cost_campshape,
+                           cost_test,
+                           cost_testsd, 
+                           cost_testmin,
+                           cost_testmax,
+                           cost_testshape,
+                           cost_tpt,
+                           cost_tptsd, 
+                           cost_tptmin,
+                           cost_tptmax,
+                           cost_tptshape,
+                           qol_tb,
+                           qol_tbsd, 
+                           qol_tbmin,
+                           qol_tbmax,
+                           qol_tbshape,
+                           qol_eptb,
+                           qol_eptbsd, 
+                           qol_eptbmin,
+                           qol_eptbmax,
+                           qol_eptbshape,
+                           qol_postb,
+                           qol_postbsd, 
+                           qol_postbmin,
+                           qol_postbmax,
+                           qol_postbshape
+                           
+                           
+      )
     )
     
     cohort_size<-input$n
@@ -2115,7 +2184,7 @@ server <- function(input, output,session) {
     
     qaly<- sim_healthy_qaly - sim_tb_qaly - sim_eptb_qaly - sim_post_qaly - deaths
     qaly_itv<- sim_healthy_qaly_itv - sim_tb_qaly_itv - sim_eptb_qaly_itv - sim_post_qaly_itv - deaths_itv
-  
+    
     
     # Costs
     start_cost<- sim_test_cost*cohort_size + npositives*sim_tpt_cost + sim_camp_cost
@@ -2257,7 +2326,7 @@ server <- function(input, output,session) {
       gridExtra::grid.arrange(p)  
       
     })
-
+    
     ## Download CSV
     output$table <- renderTable({
       dfage()
