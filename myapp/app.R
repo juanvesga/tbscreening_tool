@@ -1,20 +1,8 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
+
 rm(list = ls()) 
 
-
-
-
-#library(shiny)
 library(shinydashboard)
 library(shinyvalidate)
-#library(shinydashboardPlus)
 library(DT)
 library(tidyverse)
 library(reshape2)
@@ -23,8 +11,7 @@ library(rms)
 library(lubridate)
 library(glue)
 library(matrixStats)
-#library(hesim)
-library("magrittr") # Use pipes
+library(magrittr) 
 library(data.table)
 library(BCEA)
 library(ggplot2)
@@ -33,11 +20,14 @@ library(purrr)
 # path_app<-rstudioapi::getSourceEditorContext()$path
 # setwd(gsub('/app.R','', path_app))
 
+
+# Load necessary input ----------------------------------------------------
+
+
 source("Categorical.R")
 source("rpert.R")
 
 # Load required objects into working directory
-
 load("qfn_lookup") # QFT percentile look-up table
 load("tspot_lookup") # T=SPOT percentile look-up table
 load("tst_lookup") # TST percentile look-up table
@@ -45,17 +35,16 @@ load("fit_final_github_2020-08-14") # This is the model object
 
 model<-fit.final.github
 coeff<-model@lm$coefficients
-# Load WHO TB incidence by country data and preprocess for merging later
 
+# Load WHO TB incidence by country data and preprocess for merging later
 country_tb_inc <- read.csv("TB_burden_countries_2020-08-14.csv")
 country_tb_inc <- country_tb_inc %>% select(country, year, e_inc_100k) %>% 
   rename(country_of_birth=country, year_of_entry=year)
 
-setosa <- filter(iris, Species == "setosa")
-
 
 
 tests <- c("QuantiFERON", "T-SPOT.TB", "Tuberculin Skin Test")
+
 age_uk <- t(data.frame("A_16to35"=c(14),
                        "A_36to45"=c(32),
                        "A_46to65"=c(32),
@@ -98,9 +87,11 @@ qol_full <- t(data.frame("A_16to35"=c(0.93),
 X <- Categorical(rownames(age_uk), p = age_uk/100)
 
 
-# Define UI for application that draws a histogram
+# UI  Menu---------------------------------------------------------------------
 ui <- dashboardPage(
-  dashboardHeader(title = "LTBI CEA Tool", tags$li(class = "dropdown", actionButton("home", "Home"))),
+  skin = "black",
+  dashboardHeader(title = "LTBI CEA Tool", tags$li(class = "dropdown", 
+                                                   actionButton("home","Home", icon = icon("house")))),
   ## Sidebar content
   dashboardSidebar(
     sidebarMenu(id = "sidebar",
@@ -108,12 +99,12 @@ ui <- dashboardPage(
                 menuItem("Single Run", tabName = "single", icon = icon("bar-chart"), startExpanded = TRUE,
                          menuSubItem("How to...", tabName = "how", icon = icon("check")),
                          menuSubItem("Demographics", tabName = "epi", icon = icon("bar-chart")),
-                         menuSubItem("LTBI tests", tabName = "ltbi", icon = icon("vial")),
+                         #menuSubItem("LTBI tests", tabName = "ltbi", icon = icon("vial")),
                          menuSubItem("LTBI cascade", tabName = "cascade", icon = icon("chart-simple")),
                          menuSubItem("Costs", tabName = "cost", icon = icon("sterling-sign")),
-                         menuSubItem("Quality of Life", tabName = "qol", icon = icon("staff-snake")),
-                         menuSubItem("TB Incidence", tabName = "res_inc"),
-                         menuSubItem("Costs", tabName = "res_costs"),
+                         menuSubItem("QoL", tabName = "qol", icon = icon("staff-snake")),
+                         #menuSubItem("TB Incidence", tabName = "res_inc"),
+                         #menuSubItem("Costs", tabName = "res_costs"),
                          menuSubItem("ICER", tabName = "res_icer")
                 ),
                 menuItem("Scenarios", icon = icon("bar-chart"), startExpanded = TRUE,
@@ -127,88 +118,138 @@ ui <- dashboardPage(
                 menuItem("About", tabName = "about", icon = icon("th"))
     )
   ),
-  ## Body content
+  
+  # UI body---------------------------------------------------------------------
+  
   dashboardBody(
     tabItems(
-      # Home
+      
+      
+      # UI home -----------------------------------------------------------------
+      
+      
       tabItem(tabName = "home",
-              fluidRow(
-                box(
-                  title = "Single Run",
-                  p("Define a cohort, input costs and epidemiological parameters and run a single scenario CEA"),
-                ),
-                box(
-                  tags$li( actionButton("single", "Single run", class = "btn-primary"))
-                ),
-              ),
               
-              fluidRow(
+              
+              
+              
+              fluidPage(
+                h1("TB infection test cost-effectiveness calculator",style = "text-align: center"),
+                br(),
+                br(),
+                p("This tool was created to help quantify and visualise the 
+                  potential impact of delivering TB infection tests and
+                  TB preventive regimens among immigrant populations in the UK.",
+                  style = "text-align: justify; font-size:18px"),
+                p("Three different modalities for analysis are available: 
+                'Single Run', 'Scenarios', and 'Advanced'. Choose your prefered mode and 
+                navigate using the 'Go' button.",style = "text-align: justify; font-size:18px"),
+                p("Choose your prefered mode and 
+                navigate using the 'Go' button.",style = "text-align: justify; font-size:18px"),
+                
+                br(),
+                br(),
+                br(),
+                br(),
+                
                 box(
-                  title = "Scenarios",
-                  p("Upload selected scenarios and compare"),
+                  style = "text-align: justify; font-size:18px",
+                  title = "Single Run",
+                  width = 4, background = "navy",
+                  p("Define a baseline cohort, input epidemiological and cost
+                  parameterers to retrieve estimations of expected TB disease cases, 
+                  cost projections of the testing intervention anda full set of
+                  cost-effectiveness analysis (CEA) output."),
+                  tags$p( actionButton("single", "Go", class = "dark")),
+                  
                 ),
                 box(
-                  tags$li(actionButton("scenarios", "Scenarios", class = "btn-success"))
+                  style = "text-align: justify; font-size:18px",
+                  title = "Scenarios",
+                  width = 4, background = "orange",
+                  p("Upload pre-populated scenarios created with this tool -or 
+                    add new ones using the csv template, and run a scenario 
+                    comparison analysis"),
+                  tags$p(actionButton("compare", "Go", class = "dark"))
+                ),
+                box(
+                  style = "text-align: justify; font-size:18px",
+                  title = "Advanced",
+                  width = 4, background = "maroon",
+                  p("Upload multiple scenarios using batch files, and download 
+                    simulation results as .csv"),
+                  tags$p( actionButton("advanced", "Go", class = "dark"))
                 )
               ),
-              fluidRow(
-                box(
-                  title = "Advanced",
-                  p("Use a batch file to run multiple scenarios and download numeric results as .csv")
-                ),
-                box(
-                  tags$li( actionButton("advanced", "Advanced", class = "btn-warning"))
-                )
-              )
       ),
       
       
       
-      # 5 About tab
+      
+      # UI single: how  ---------------------------------------------------------
+      
+      
       tabItem(tabName = "how",
+              
+              
               fluidPage(
-                p("How to use this tool",style = "font-size:25px"),
-                p("1) Define the size, age distribution and ethnic origin 
-                  in the baseline cohort in the ",  
-                  span(tags$a("Demographics Tab", onclick="Shiny.onInputChange('tab', 'epi')"),
-                       style = "color:blue"),
-                  style = "font-size:18px"),
+                h2("How to use this tool"),
                 
-                p("2) Provide details on the expected positivity of the LTBI, 
-                  and if known HIV prevalence in the baseline cohort.",style = "font-size:18px"),
+                fluidRow(column(12, div(style="display: inline-block;",
+                                        tags$p("1) Define the size, demographics,
+                                              and expected positivity of the LTBI test  
+                                              in the baseline cohort" , 
+                                               style = "font-size:18px")),
+                                actionButton("demog", "Demographics tab", 
+                                             icon = icon("bar-chart"),
+                                             class = "light"))),
+                
+                fluidRow(column(12, div(style="display: inline-block;",
+                                        tags$p("2) Select your choice of LTBI 
+                                        test and define the steps in the cascade
+                                               from test to regimen completion" , 
+                                               style = "font-size:18px")),
+                                actionButton("ltbicasc", "LTBI cascade", 
+                                             icon = icon("chart-simple"),
+                                             class = "light"))),
                 
                 
-                p("3) Select your choice of LTBI test, TPT regimen and eligibility 
-                  and main parameters on completion",style = "font-size:18px"),
+                fluidRow(column(12, div(style="display: inline-block;",
+                                        tags$p("3) Select costs for relevant 
+                                        TB outcomes. Here you can define the 
+                                               shape of the background distributions for these inputs" , 
+                                               style = "font-size:18px")),
+                                actionButton("cost_tab", "Costs", 
+                                             icon = icon("sterling-sign"),
+                                             class = "light"))),
                 
-                p("4) Select costs and QoL for relevant TB outcomes. Here you can 
-                  define the shape of the background distributions for these inputs",style = "font-size:18px"),
+                fluidRow(column(12, div(style="display: inline-block;",
+                                        tags$p("4) Select Qality of Life (QoL)
+                                        for relevant TB outcomes. Here you can define the 
+                                               shape of the background distributions for these inputs" , 
+                                               style = "font-size:18px")),
+                                actionButton("qol_tab", "QoL", 
+                                             icon = icon("staff-snake"),
+                                             class = "light"))),
                 
-                p("5) Choose your time-horizon for analysis",style = "font-size:18px"),
+                
+                p("5) Choose a time-horizon for analysis in the slider below",style = "font-size:18px"),
                 
                 sliderInput("t_hor", "Time-horizon (years)", 2, 50, 5),
                 
-                p("6) Explore costs and epidemilogical estimates in the",
-                  span(tags$a("Results Tab", onclick="Shiny.onInputChange('tab', 'epi')"),
-                       style = "color:blue",
-                       style = "font-size:18px"),
-                  style = "font-size:18px"),
                 
-                p("7) Run CEA analsys using the run button in the ICER panel. 
-                  Here you can download a report of your scenario",
-                  style = "font-size:18px"),
-                
-                p("INPUT PARAMETERS FROM .CSV: Saved scenario parameters can be 
-                uploaded again with the button below. Select a file to upload and 
-                go straight to the ICER panel",
-                  style = "font-size:18px"),
-                
-                fileInput("upload", "Upload scenario parameters")
+                fluidRow(column(12, div(style="display: inline-block;",
+                                        tags$p("6) Run CEA analsys using the run 
+                                        button in the ICER panel. Here you can 
+                                               download a report of your scenario" , 
+                                               style = "font-size:18px")),
+                                actionButton("icer_tab", "ICER", 
+                                             class = "light")))
               )
       ),
       
       
-      # 1 Epidemiology
+      # UI single: Demog  ---------------------------------------------------------
       tabItem(tabName = "epi",
               
               fluidRow(
@@ -238,14 +279,10 @@ ui <- dashboardPage(
                 
                 box(plotOutput("distPlot")),
                 
-              )
-      ),
-      # 2 LTBI Test
-      tabItem(tabName = "ltbi",
-              
+              ),
               fluidRow(
                 box(
-                  
+                  title = "HIV prevalence (%)",
                   sliderInput("hiv_prev4", "65+", 0, 100, 0),
                   sliderInput("hiv_prev3", "46-65", 0, 100, 0),
                   sliderInput("hiv_prev2", "36-45 ", 0, 100, 0),
@@ -273,7 +310,7 @@ ui <- dashboardPage(
               )
       ),
       
-      # 3 LTBI cascade
+      # UI single: LTBI casc ----------------------------------------------------
       tabItem(tabName = "cascade",
               
               fluidRow(
@@ -344,7 +381,7 @@ ui <- dashboardPage(
       ),
       
       
-      # 4 Cost
+      # UI single: Costs ----------------------------------------------------
       tabItem(tabName = "cost",
               # Tets cost
               fluidRow(
@@ -448,7 +485,7 @@ ui <- dashboardPage(
               
       ),
       
-      # 5 QoL
+      # UI single: QoL ----------------------------------------------------
       tabItem(tabName = "qol",
               
               fluidRow(
@@ -594,7 +631,7 @@ ui <- dashboardPage(
               
       ),
       
-      # 6 Incidenceplots
+      # UI single: Incidence plots ----------------------------------------------------
       tabItem(tabName = "res_inc",
               fluidRow(column(9,
                               box(width=12,
@@ -605,8 +642,7 @@ ui <- dashboardPage(
               
       ),
       
-      # 6 costplots
-      
+      # UI single: Cost plots ----------------------------------------------------
       
       tabItem(tabName = "res_costs",
               fluidRow(column(9,
@@ -617,7 +653,8 @@ ui <- dashboardPage(
               )
       ),
       
-      # 7 ICER
+      # UI single: ICER plane ----------------------------------------------------
+      
       tabItem(tabName = "res_icer",
               fluidRow(
                 valueBoxOutput("ICER"),
@@ -643,7 +680,8 @@ ui <- dashboardPage(
               )
       ),
       
-      # How scenarios
+      # UI scenarios: how... ----------------------------------------------------
+      
       tabItem(tabName = "how_scen",
               fluidPage(
                 p("INPUT PARAMETERS FROM .CSV: Saved scenario parameters can be 
@@ -654,6 +692,8 @@ ui <- dashboardPage(
                 fileInput("upload", "Upload scenario parameters")
               )
       ),
+      
+      # UI advanced: how... ----------------------------------------------------
       tabItem(tabName = "how_adv",
               fluidPage(
                 p("INPUT PARAMETERS FROM .CSV: Saved scenario parameters can be 
@@ -667,7 +707,7 @@ ui <- dashboardPage(
       
       
       
-      # 5 About tab
+      # UI About ----------------------------------------------------
       tabItem(tabName = "about",
               fluidPage(
                 p("TB infection testing cost-effectiveness calculator",style = "font-size:25px"),
@@ -683,7 +723,7 @@ ui <- dashboardPage(
                   intervention, and importantly, a full set of cost-effectiveness 
                   analysis (CEA) output.",style = "text-align: justify; font-size:18px"),
                 
-                p("How it works",style = "font-size:25px"),
+                p("About this tool",style = "font-size:25px"),
                 
                 p("This tool builds on a previosuly developed personalised risk 
                   predictor for incident TB", 
@@ -711,7 +751,10 @@ ui <- dashboardPage(
 )
 
 
-###################################################################################
+
+# server Function ------------------------------------------------------------------
+
+
 server <- function(input, output,session) {
   
   # Home button tag
@@ -734,10 +777,64 @@ server <- function(input, output,session) {
     updateTabItems(session, "sidebar", "how_adv")
   })
   
-  ## Epidemiology Tab
+  # Compare button tag
+  observeEvent(input$demog, {
+    updateTabItems(session, "sidebar", "epi")
+  })
   
-  set.seed(122)
-  histdata <- rnorm(500)
+  # Compare button tag
+  observeEvent(input$ltbicasc, {
+    updateTabItems(session, "sidebar", "cascade")
+  })
+  
+  # Compare button tag
+  observeEvent(input$cost_tab, {
+    updateTabItems(session, "sidebar", "cost")
+  })
+  
+  # Compare button tag
+  observeEvent(input$qol_tab, {
+    updateTabItems(session, "sidebar", "qol")
+  })
+  
+  # Compare button tag
+  observeEvent(input$icer_tab, {
+    updateTabItems(session, "sidebar", "res_icer")
+  })
+  
+  # Read input tables ------------------------------------------------------------
+  
+  dfprev <- reactive({ 
+    x<-data.frame(
+      age=c("16-35","36-45","46-65","65+"),
+      value=as.numeric(c(input$prev1,input$prev2,input$prev3,input$prev4)))
+    return(x)
+  })
+  
+  dfhivprev <- reactive({ 
+    x<-data.frame(
+      age=c("16-25","26-45","46-65","65+"),
+      value=as.numeric(c(input$hiv_prev1,input$hiv_prev2,input$hiv_prev3,input$hiv_prev4)))
+    return(x)
+  })
+  
+  dffullqol <- reactive({ 
+    x<-data.frame(
+      age=c("16-25","26-45","46-65","65+"),
+      value=as.numeric(c(input$qolfull_1,input$qolfull_2,input$qolfull_3,input$qolfull_4)))
+    return(x)
+  })
+  
+  dfage <- reactive({ 
+    
+    x<-data.frame(
+      age=c("16-35","36-45","46-65","65+"),
+      value=as.numeric(c(input$age1,input$age2,input$age3,input$age4)))
+    return(x)
+  })
+  
+  
+  # Demog tab contents------------------------------------------------------------
   
   observeEvent( input$n, {
     updateNumericInput(session, "n_selected", value = input$n)
@@ -756,20 +853,6 @@ server <- function(input, output,session) {
             as.numeric(input$age2) +  
             as.numeric(input$age3)+ 
             as.numeric(input$age4) )
-  })
-  
-  # iv<-InputValidator$new()
-  # 
-  # iv$add_rule(as.numeric(valfun()) ,sv_equal(100))
-  # 
-  # iv$enable()
-  
-  dfage <- reactive({ 
-    
-    x<-data.frame(
-      age=c("16-35","36-45","46-65","65+"),
-      value=as.numeric(c(input$age1,input$age2,input$age3,input$age4)))
-    return(x)
   })
   
   
@@ -795,26 +878,6 @@ server <- function(input, output,session) {
     (prev_uk)
   })
   
-  dfprev <- reactive({ 
-    x<-data.frame(
-      age=c("16-35","36-45","46-65","65+"),
-      value=as.numeric(c(input$prev1,input$prev2,input$prev3,input$prev4)))
-    return(x)
-  })
-  
-  dfhivprev <- reactive({ 
-    x<-data.frame(
-      age=c("16-25","26-45","46-65","65+"),
-      value=as.numeric(c(input$hiv_prev1,input$hiv_prev2,input$hiv_prev3,input$hiv_prev4)))
-    return(x)
-  })
-  
-  dffullqol <- reactive({ 
-    x<-data.frame(
-      age=c("16-25","26-45","46-65","65+"),
-      value=as.numeric(c(input$qolfull_1,input$qolfull_2,input$qolfull_3,input$qolfull_4)))
-    return(x)
-  })
   
   
   #output the datatable based on the dataframe (and make it editable)
@@ -832,12 +895,14 @@ server <- function(input, output,session) {
     if(k < 0){ #convert to positive if negative
       k <- k * -1
     }
-    
     #write values to reactive
     v$data[i,j] <- k
   })
   
   
+  
+  
+  # Epi tab plots -----------------------------------------------------------
   
   
   
@@ -923,7 +988,10 @@ server <- function(input, output,session) {
   
   
   
-  #### LTBI cascade 
+  
+  
+  # LTBI cascade ------------------------------------------------------------
+  
   
   observeEvent(input$tpt, {
     
@@ -1017,7 +1085,9 @@ server <- function(input, output,session) {
   })
   
   
-  ###### Costs
+  
+  # Costs tab contents ------------------------------------------------------
+  
   
   output$costPERT1<- renderPlot({
     
@@ -1106,7 +1176,10 @@ server <- function(input, output,session) {
   })
   
   
-  ###### QOL
+  
+  
+  # QoL content -------------------------------------------------------------
+  
   estBetaParams <- function(mu, var) {
     alpha <- ((1 - mu) / var - 1 / mu) * mu ^ 2
     beta <- alpha * (1 / mu - 1)
@@ -1115,8 +1188,6 @@ server <- function(input, output,session) {
   
   # Prev plot
   output$fullQOL_Plot <- renderPlot({
-    
-    
     
     dffullqol() %>% 
       ggplot(aes(x = age, y=value )) +
@@ -1140,7 +1211,6 @@ server <- function(input, output,session) {
   
   # Qol PtTB
   output$qolPERT1<- renderPlot({
-    
     
     n<-input$n
     
@@ -1174,7 +1244,6 @@ server <- function(input, output,session) {
   # Qol EPtTB
   output$qolPERT2<- renderPlot({
     
-    
     n<-input$n
     
     if (input$eptbqol_dist =="Beta"){
@@ -1205,7 +1274,6 @@ server <- function(input, output,session) {
   
   # Qol PostTB
   output$qolPERT3<- renderPlot({
-    
     
     n<-input$n
     
@@ -1238,7 +1306,6 @@ server <- function(input, output,session) {
   # Qol TPT AE
   output$qolPERT4<- renderPlot({
     
-    
     n<-input$n
     
     if (input$aeqol_dist =="Beta"){
@@ -1265,15 +1332,14 @@ server <- function(input, output,session) {
          xlab = "QoL losses",
          col = "violetred3")
     
-    
-    
   })
   
   
   
   
   
-  ### Get dataset for Periskope   
+  # Build Periskope dataset -------------------------------------------------
+  
   df<- reactive({
     
     cohort_size<-input$n
@@ -1392,7 +1458,10 @@ server <- function(input, output,session) {
   
   
   
-  ### Get predictions object
+  
+  # Create predictions object ------------------------------------------------
+  
+  
   
   preds <- reactive({
     
@@ -1491,7 +1560,11 @@ server <- function(input, output,session) {
     
   })
   
-  # Incidence plot
+  
+  
+  # Epi plots ----------------------------------------------------------
+  
+  
   output$plot_inc <- renderPlot({
     
     req(input$t_hor)
@@ -1565,7 +1638,7 @@ server <- function(input, output,session) {
       )
     
     
-    ## Cases averted
+    # Cases averted
     
     qtls <- as.data.frame(
       rowQuantiles(t(pred$casesaverted),
@@ -1604,7 +1677,9 @@ server <- function(input, output,session) {
   })
   
   
-  ### Costs plots
+  
+  # Cost plots --------------------------------------------------------------
+  
   
   output$plot_costs <- renderPlot({
     
@@ -1646,8 +1721,6 @@ server <- function(input, output,session) {
       )
     
     
-    
-    
     #### Cost interventions
     qtls <- as.data.frame(
       rowQuantiles(t(pred$predictions_cost_itv),
@@ -1680,8 +1753,6 @@ server <- function(input, output,session) {
     
     
     ## Costs saved
-    
-    
     
     qtls <- as.data.frame(
       rowQuantiles(t(pred$costsaved),
@@ -1718,15 +1789,16 @@ server <- function(input, output,session) {
   })
   
   
-  ## Get ICERs 
+  
+  
+  # Single run ICER object -----------------------------------------------------
+  
   
   
   ### ICER plots
   
   
   icer_object <- eventReactive(input$add,{
-    
-    
     
     #req(input$t_hor)
     set.seed(131)
@@ -1737,8 +1809,6 @@ server <- function(input, output,session) {
       beta <- alpha * (1 / mu - 1)
       return(params = list(alpha = alpha, beta = beta))
     }
-    
-    
     
     tpt_eff<-0
     if (input$tpt == "6INH"){
@@ -2142,7 +2212,6 @@ server <- function(input, output,session) {
     
     for (ii in 2:time_horizon){
       base1$studytime <- (365*ii)-42
-      #head(base1)
       preds <- as.data.frame((predict(model, base1, type="fail", se.fit=T)))
       p_in<-preds[,1]
       predictions[,ii]<-p_in 
@@ -2162,6 +2231,7 @@ server <- function(input, output,session) {
     sim_cases_itv<-(sim_cases * tpt_eff)
     
     
+    browser()
     deaths<-rbinom(sim_cases,sim_cases,cfr)
     deaths_itv<-rbinom(sim_cases_itv,sim_cases,cfr)
     
@@ -2213,7 +2283,9 @@ server <- function(input, output,session) {
   })
   
   
-  # Icer plane plot
+  
+  # ICER plane --------------------------------------------------------------
+  
   
   observeEvent(input$add, {
     
@@ -2327,10 +2399,12 @@ server <- function(input, output,session) {
       
     })
     
-    ## Download CSV
+    # Download CSV
     output$table <- renderTable({
       dfage()
     })
+    
+    # Download single parameters ----------------------------------------------
     
     output$btndcsv <-
       downloadHandler(
@@ -2342,7 +2416,11 @@ server <- function(input, output,session) {
         }
       )
     
-    ## Produce report
+    
+    
+    
+    # Produce markdown report -------------------------------------------------
+    
     
     output$btn <- downloadHandler(
       
@@ -2362,6 +2440,9 @@ server <- function(input, output,session) {
     
     ########### Scenarios 
     
+    # Scenarios ---------------------------------------------------------------
+    
+    
     # Table_params
     output$table_params <- renderTable({
       icer_object()$table
@@ -2377,5 +2458,3 @@ server <- function(input, output,session) {
 
 shinyApp(ui, server)
 
-
-shinyApp(ui = ui, server = server)
