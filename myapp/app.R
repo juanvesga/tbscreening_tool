@@ -1,6 +1,9 @@
 
 rm(list = ls()) 
 
+require(shiny)
+require(shinythemes)
+require(xlsx)
 library(shinydashboard)
 library(shinyvalidate)
 library(DT)
@@ -16,6 +19,8 @@ library(data.table)
 library(BCEA)
 library(ggplot2)
 library(purrr)
+
+
 
 # path_app<-rstudioapi::getSourceEditorContext()$path
 # setwd(gsub('/app.R','', path_app))
@@ -58,6 +63,11 @@ prev_uk <- t(data.frame("A_16to35"=c(10),
 rownames(age_uk)<-paste(c("16-35","36-45","46-65","65+"))
 rownames(prev_uk)<-paste(c("16-35","36-45","46-65","65+"))
 
+################# required data for QALY app (from https://github.com/LSHTM-GHECO/COVID19_QALY_App/tree/master) 
+q.male <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 1))
+q.female <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 2)) 
+qol <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 3))
+covid.age <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 4))
 
 
 
@@ -89,7 +99,9 @@ X <- Categorical(rownames(age_uk), p = age_uk/100)
 
 # UI  Menu---------------------------------------------------------------------
 ui <- dashboardPage(
-  skin = "black",
+  
+  
+   skin = "black",
   dashboardHeader(title = "LTBI CEA Tool", tags$li(class = "dropdown", 
                                                    actionButton("home","Home", icon = icon("house")))),
   ## Sidebar content
@@ -105,7 +117,7 @@ ui <- dashboardPage(
                          menuSubItem("QoL", tabName = "qol", icon = icon("staff-snake")),
                          #menuSubItem("TB Incidence", tabName = "res_inc"),
                          #menuSubItem("Costs", tabName = "res_costs"),
-                         menuSubItem("ICER", tabName = "res_icer")
+                         menuSubItem("ICER", tabName = "res_icer", icon = icon("bullseye"))
                 ),
                 menuItem("Scenarios", icon = icon("bar-chart"), startExpanded = TRUE,
                          menuSubItem("How to...", tabName = "how_scen"),
@@ -134,6 +146,13 @@ ui <- dashboardPage(
               
               
               fluidPage(
+                
+                theme = shinythemes::shinytheme("flatly"),
+                tags$head(
+                  tags$style(HTML("hr {border-top: 1px solid #000000;}"))
+                ),
+                
+                
                 h1("TB infection test cost-effectiveness calculator",style = "text-align: center"),
                 br(),
                 br(),
@@ -142,8 +161,7 @@ ui <- dashboardPage(
                   TB preventive regimens among immigrant populations in the UK.",
                   style = "text-align: justify; font-size:18px"),
                 p("Three different modalities for analysis are available: 
-                'Single Run', 'Scenarios', and 'Advanced'. Choose your prefered mode and 
-                navigate using the 'Go' button.",style = "text-align: justify; font-size:18px"),
+                'Single Run', 'Scenarios', and 'Advanced'.",style = "text-align: justify; font-size:18px"),
                 p("Choose your prefered mode and 
                 navigate using the 'Go' button.",style = "text-align: justify; font-size:18px"),
                 
@@ -158,8 +176,8 @@ ui <- dashboardPage(
                   width = 4, background = "navy",
                   p("Define a baseline cohort, input epidemiological and cost
                   parameterers to retrieve estimations of expected TB disease cases, 
-                  cost projections of the testing intervention anda full set of
-                  cost-effectiveness analysis (CEA) output."),
+                  cost projections of the testing intervention and a full set of
+                  cost-effectiveness analysis output."),
                   tags$p( actionButton("single", "Go", class = "dark")),
                   
                 ),
@@ -200,7 +218,7 @@ ui <- dashboardPage(
                                               and expected positivity of the LTBI test  
                                               in the baseline cohort" , 
                                                style = "font-size:18px")),
-                                actionButton("demog", "Demographics tab", 
+                                actionButton("demog", "Demographics", 
                                              icon = icon("bar-chart"),
                                              class = "light"))),
                 
@@ -236,14 +254,21 @@ ui <- dashboardPage(
                 p("5) Choose a time-horizon for analysis in the slider below",style = "font-size:18px"),
                 
                 sliderInput("t_hor", "Time-horizon (years)", 2, 50, 5),
+
+
+                p("6) Choose a discount rate (applied to costs and QoL) in the slider below",style = "font-size:18px"),
+                
+                numericInput("disc_rate", em("Discount rate (0%-10%)"), 3.5, min = 0, 
+                             max = 100),
                 
                 
                 fluidRow(column(12, div(style="display: inline-block;",
-                                        tags$p("6) Run CEA analsys using the run 
+                                        tags$p("7) Run CEA analsys using the run 
                                         button in the ICER panel. Here you can 
                                                download a report of your scenario" , 
                                                style = "font-size:18px")),
                                 actionButton("icer_tab", "ICER", 
+                                             icon = icon("bullseye"),
                                              class = "light")))
               )
       ),
@@ -251,6 +276,9 @@ ui <- dashboardPage(
       
       # UI single: Demog  ---------------------------------------------------------
       tabItem(tabName = "epi",
+              
+              tabsetPanel(type = "tabs", 
+                          tabPanel("Demographics",
               
               fluidRow(
                 box(
@@ -279,7 +307,10 @@ ui <- dashboardPage(
                 
                 box(plotOutput("distPlot")),
                 
-              ),
+              )),
+              
+              tabPanel("HIV prevalence",
+              
               fluidRow(
                 box(
                   title = "HIV prevalence (%)",
@@ -293,12 +324,14 @@ ui <- dashboardPage(
                 box(plotOutput("hiv_prevPlot")),
                 
                 
-              ),
+              )),
+              
+              tabPanel("LTBI prevalence",
               
               fluidRow(
                 
                 box(
-                  title = "TB infection prevalence (%)",
+                  title = "Expected TB infection prevalence (%)",
                   sliderInput("prev4", "65+", 0, 100, prev_uk[4]),
                   sliderInput("prev3", "46-65", 0, 100, prev_uk[3]),
                   sliderInput("prev2", "36-45 ", 0, 100, prev_uk[2]),
@@ -308,6 +341,7 @@ ui <- dashboardPage(
                 box(plotOutput("prevPlot")),
                 
               )
+              ))
       ),
       
       # UI single: LTBI casc ----------------------------------------------------
@@ -383,6 +417,10 @@ ui <- dashboardPage(
       
       # UI single: Costs ----------------------------------------------------
       tabItem(tabName = "cost",
+              
+              tabsetPanel(type = "tabs", 
+                          tabPanel("LTBI test",
+              
               # Tets cost
               fluidRow(
                 box(width = 4,
@@ -412,12 +450,15 @@ ui <- dashboardPage(
                       numericInput("cost_testsd_gamma", "SD", value = 10, min = 0, max = Inf)
                   ),
                 )
-              ),
+              )
+                          ),
               
+              tabPanel("Test campaign",
+                       
               # Campaign cost
               fluidRow(  
                 box(width = 4,
-                    title="Cost of testing campaign (£) - Incurred only at start",
+                    title="Overall cost (£) - Incurred only at start",
                     status = "primary", solidHeader = TRUE,
                     plotOutput("costPERT2", height = "35vh")
                     
@@ -444,8 +485,13 @@ ui <- dashboardPage(
                       numericInput("cost_campsd_gamma", "SD", value = 200, min = 0, max = Inf)
                   ),
                 )
+              )
               ),
+              
+              
               # cost TPT
+              tabPanel("TPT regimen",
+                       
               fluidRow(  
                 box(width = 4,
                     title="Unit Cost of completed TPT regimen (£)",
@@ -482,12 +528,17 @@ ui <- dashboardPage(
                   sliderInput("cost_ltfup", "(%)", 0, 100, 0.5),
                 ),
               ),
+              )
+              )
               
       ),
       
       # UI single: QoL ----------------------------------------------------
       tabItem(tabName = "qol",
               
+              tabsetPanel(type = "tabs", 
+                          tabPanel("Baseline QoL",
+                                   
               fluidRow(
                 
                 box(
@@ -500,10 +551,13 @@ ui <- dashboardPage(
                   sliderInput("qolfull_2", "36-45 ", 0, 1, qol_full[2]),
                   sliderInput("qolfull_3", "46-65", 0, 1, qol_full[3]),
                   sliderInput("qolfull_4", "65+", 0, 1, qol_full[4])
-                )  
+                )
+              )
               ),
               
               # PTB QoL
+              tabPanel("Pulmonary TB",
+                       
               fluidRow(
                 box(width = 4,
                     title="QALY loss due to pulmonary TB disease",
@@ -532,8 +586,11 @@ ui <- dashboardPage(
                       sliderInput("qol_ptbsd_beta", "SD", value = 0.016, min = 0, max = 1)
                   ),
                 )
+              )
               ),
               
+              tabPanel("Extra-pulmonary TB",
+                       
               # EPTB QoL
               fluidRow(
                 box(width = 4,
@@ -563,8 +620,11 @@ ui <- dashboardPage(
                       sliderInput("qol_eptbsd_beta", "SD", value = 0.01, min = 0, max = 1)
                   ),
                 )
+              )
               ),
               
+              tabPanel("Post-TB",
+                       
               # QoL postTB
               
               fluidRow(
@@ -595,10 +655,12 @@ ui <- dashboardPage(
                       sliderInput("qol_postsd_beta", "SD", value = 0.01, min = 0, max = 1)
                   ),
                 )
+              )
               ),
               
               # QoL TPT Adevrese events (AE)
-              
+              tabPanel("TPT adverse events",
+                       
               fluidRow(
                 box(width = 4,
                     title="QALY loss due adverse events (AE) from TPT",
@@ -627,6 +689,8 @@ ui <- dashboardPage(
                       numericInput("qol_aesd_beta", "SD", value = 0.001, min = 0, max = 1)
                   ),
                 )
+              )
+              )
               )
               
       ),
@@ -802,6 +866,7 @@ server <- function(input, output,session) {
     updateTabItems(session, "sidebar", "res_icer")
   })
   
+
   # Read input tables ------------------------------------------------------------
   
   dfprev <- reactive({ 
@@ -1788,9 +1853,139 @@ server <- function(input, output,session) {
     
   })
   
+  # QALY App components -----------------------------------------------------
+  
+  # Reactive dependencies - if these change then MODEL will run again and update values
+  xxchange <- reactive({
+    paste(input$disc_rate)
+  })
   
   
+  QoLmodel <- eventReactive(xxchange(), {
+    country <- "UK"
+    smr <- 1#input$smr
+    qcm <- 1
+    r <- input$disc_rate/100
   
+    shiny::validate(
+      need(input$disc_rate <=10, "Please choose a valid discount rate between 0% and 10%"),
+      need(input$disc_rate >=0, "Please choose a valid discount rate between 0% and 10%"),
+    )
+
+    myvector <- c("Age",country)
+    
+    l_x_est <- function(dt, countr, smr){
+      ## dt = data table with q(x) vaues
+      ## country = selected country
+      ## smr = smr
+      myvector <- c("Age",countr)
+      
+      y <- dt[, ..myvector]
+      colnames(y) <- c("x","q_x")
+      
+      y[ , d_x := -log(1-y$q_x)]
+      
+      y[ 1, l_x := 100000] 
+      
+      for (i in 2:nrow(y)){
+        y[i, l_x := y$l_x[[i-1]] * 
+            exp((-y$d_x[[i-1]])*smr)] 
+      }
+      return(y)
+    }
+    
+    q.male <- l_x_est(q.male, country, smr)
+    q.female <- l_x_est(q.female, country, smr)
+    
+    q.person <- merge(q.male, q.female, by="x")
+    colnames(q.person) <- c("x","q_male","d_male","l_male",
+                            "q_female","d_female","l_female")
+    q.person[ , p.f := l_female/(l_female+l_male)]
+    q.person[ , l_person := (p.f*l_female)+
+                ((1-p.f)*l_male)]
+    
+    for (i in 1:(nrow(q.person)-1)){
+      q.person[i, bigl_x := (q.person$l_person[[i]]+ q.person$l_person[[i+1]])/2]
+    }
+    
+    q.person[nrow(q.person), bigl_x := (q.person$l_person[[nrow(q.person)]])/2]
+    
+    for (i in 1:nrow(q.person)){
+      q.person[i, t_x := sum(q.person$bigl_x[i:nrow(q.person)])]
+    }
+    
+    q.person[ , LE_x := t_x/l_person]
+    
+    ########### calculating QALE ########
+    myvector.qol <- c("low","high",country)
+    
+    dt.qol <- qol[, ..myvector.qol]
+    colnames(dt.qol) <- c("low","high","qol_age")
+    
+    qale <- q.person[dt.qol, on = .(x >= low, x <= high), nomatch = 0,
+                     .(x.x, l_person, bigl_x, t_x, LE_x,qol_age)]
+    
+    qale[ , z_x := bigl_x*qol_age*qcm]
+    
+    for (i in 1:nrow(qale)){
+      qale[i , t_adj := sum(qale$z_x[i:nrow(qale)])]
+    }
+    
+    qale[ , qale_x := t_adj/l_person]
+    
+    qaly.calc <- qale[ , c("x.x","z_x")]
+    
+    temp.q <- list()
+    for (i in 1:nrow(qaly.calc)){
+      temp.q[[i]] <- qaly.calc[i:nrow(qaly.calc),]
+    }
+    
+    temp.q <- bind_rows(temp.q, .id = "column_label")
+    temp.q %>% setDT() ## creating a copy as otherwise there is a warning
+    ## message (still runs but just for "clean" code), so this stops attempts of .internal.selfref detected
+    temp.q_copy <- copy(temp.q)
+    temp.q_copy[ , column_label := as.numeric(column_label)-1]
+    temp.q_copy[ , b_x := z_x/((1+r))^(x.x-(column_label))] ## n.b x.x = u and column_label = x in the corresponding formulae in the CodeBook
+    
+    
+    total.b <- temp.q_copy[,.(bigb_x=sum(b_x)), by=column_label]
+    colnames(total.b) <- c("x.x","bigb_x")
+    qale <- merge(qale, total.b, by="x.x")
+    
+    qale[ , dQALY := bigb_x/l_person]
+    
+    ######### calculating covid19 loss #######
+    myvector.cov <- c("low","high",country)
+    
+    dt.cov <- covid.age[, ..myvector.cov]
+    colnames(dt.cov) <- c("low","high","cov_age")
+    
+    dt.cov[ , midpoint := ceiling((low+high)/2)]
+    cov <- merge(qale, dt.cov, by.x="x.x", by.y="midpoint", all=FALSE)
+    
+    cov[ , weight.LE := cov_age*LE_x]
+    cov[ , weight.qale := cov_age*qale_x]
+    cov[ , weight.qaly := cov_age*dQALY]
+    
+    estimates <- colSums(cov)
+    resultstab <- data.table("Weighted LE Loss"=estimates["weight.LE"],
+                             "Weighted QALE Loss"=estimates["weight.qale"],
+                             "Weighted dQALY loss"=estimates["weight.qaly"])
+    ### ADDING AGE GROUP BREAKDOWN TABLE
+    cov[,"Age Group":=paste(cov[,low],cov[,high],sep="-")]
+    cov[ , "Age at Death (% of all deaths)" := cov_age*100]
+    setnames(cov, old=c("LE_x","qale_x","dQALY"),
+             new=c("LE","QALE","dQALY"))
+    
+    agetab <- cov[ , c("Age Group","Age at Death (% of all deaths)",
+                       "LE","QALE","dQALY")]
+
+    list(resultstab=resultstab, agetab=agetab)
+  })
+  
+  
+
+
   # Single run ICER object -----------------------------------------------------
   
   
@@ -1799,6 +1994,7 @@ server <- function(input, output,session) {
   
   
   icer_object <- eventReactive(input$add,{
+
     
     #req(input$t_hor)
     set.seed(131)
@@ -1952,6 +2148,9 @@ server <- function(input, output,session) {
       sim_tpt_cost<-rpert(n,xmin,xmax,xmean,lam)
     }
     
+
+
+    
     
     
     # tpt_cost<-input$cost_tpt
@@ -1967,6 +2166,10 @@ server <- function(input, output,session) {
     frac_eptb<-0.2
     av_tbdur <- 2
     frac_post<-0.25
+    
+    
+    qol<- QoLmodel()$agetab
+   browser()
     
     # TB QOL
     qol_tb<- 0
@@ -2231,7 +2434,7 @@ server <- function(input, output,session) {
     sim_cases_itv<-(sim_cases * tpt_eff)
     
     
-    browser()
+    #browser()
     deaths<-rbinom(sim_cases,sim_cases,cfr)
     deaths_itv<-rbinom(sim_cases_itv,sim_cases,cfr)
     
