@@ -68,7 +68,7 @@ q.male <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 1))
 q.female <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 2)) 
 qol <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 3))
 covid.age <- as.data.table(read.xlsx("Inputs/inputs.xlsx", 4))
-
+age_bands<- as.data.table(read.xlsx("Inputs/inputs.xlsx", 5))
 
 
 ##### temp Values
@@ -87,10 +87,10 @@ tbtx_cost_yr <- 6000 ## per year
 
 
 ## QoL from Kind eta l 1999
-qol_full <- t(data.frame("A_16to35"=c(0.93),
-                         "A_36to45"=c(0.91),
-                         "A_46to65"=c(0.82),
-                         "A_65plus"=c(0.75)))
+qol_full <- t(data.frame("A_16to35"=c(0.94),
+                         "A_36to45"=c(0.911),
+                         "A_46to65"=c(0.823),
+                         "A_65plus"=c(0.7525)))
 
 
 
@@ -101,7 +101,7 @@ X <- Categorical(rownames(age_uk), p = age_uk/100)
 ui <- dashboardPage(
   
   
-   skin = "black",
+  skin = "black",
   dashboardHeader(title = "LTBI CEA Tool", tags$li(class = "dropdown", 
                                                    actionButton("home","Home", icon = icon("house")))),
   ## Sidebar content
@@ -147,7 +147,7 @@ ui <- dashboardPage(
               
               fluidPage(
                 
-                theme = shinythemes::shinytheme("flatly"),
+                theme = shinythemes::shinytheme("spacelab"),
                 tags$head(
                   tags$style(HTML("hr {border-top: 1px solid #000000;}"))
                 ),
@@ -172,7 +172,7 @@ ui <- dashboardPage(
                 
                 box(
                   style = "text-align: justify; font-size:18px",
-                  title = "Single Run",
+                  title = h3("Single Run",style = 'font-size:20px;color:white;font-weight: bold;'),
                   width = 4, background = "navy",
                   p("Define a baseline cohort, input epidemiological and cost
                   parameterers to retrieve estimations of expected TB disease cases, 
@@ -183,7 +183,7 @@ ui <- dashboardPage(
                 ),
                 box(
                   style = "text-align: justify; font-size:18px",
-                  title = "Scenarios",
+                  title = h3("Scenarios",style = 'font-size:20px;color:white;font-weight: bold;'),
                   width = 4, background = "orange",
                   p("Upload pre-populated scenarios created with this tool -or 
                     add new ones using the csv template, and run a scenario 
@@ -192,7 +192,7 @@ ui <- dashboardPage(
                 ),
                 box(
                   style = "text-align: justify; font-size:18px",
-                  title = "Advanced",
+                  title = h3("Advanced",style = 'font-size:20px;color:white;font-weight: bold;'),
                   width = 4, background = "maroon",
                   p("Upload multiple scenarios using batch files, and download 
                     simulation results as .csv"),
@@ -216,56 +216,48 @@ ui <- dashboardPage(
                 fluidRow(column(12, div(style="display: inline-block;",
                                         tags$p("1) Define the size, demographics,
                                               and expected positivity of the LTBI test  
-                                              in the baseline cohort" , 
+                                              in the baseline cohort  " , 
                                                style = "font-size:18px")),
                                 actionButton("demog", "Demographics", 
                                              icon = icon("bar-chart"),
                                              class = "light"))),
+                br(),
                 
                 fluidRow(column(12, div(style="display: inline-block;",
                                         tags$p("2) Select your choice of LTBI 
                                         test and define the steps in the cascade
-                                               from test to regimen completion" , 
+                                               from test to regimen completion  " , 
                                                style = "font-size:18px")),
                                 actionButton("ltbicasc", "LTBI cascade", 
                                              icon = icon("chart-simple"),
                                              class = "light"))),
-                
+                br(),  
                 
                 fluidRow(column(12, div(style="display: inline-block;",
                                         tags$p("3) Select costs for relevant 
                                         TB outcomes. Here you can define the 
-                                               shape of the background distributions for these inputs" , 
+                                               shape of the background distributions for these inputs  " , 
                                                style = "font-size:18px")),
                                 actionButton("cost_tab", "Costs", 
                                              icon = icon("sterling-sign"),
                                              class = "light"))),
+                br(),
                 
                 fluidRow(column(12, div(style="display: inline-block;",
-                                        tags$p("4) Select Qality of Life (QoL)
-                                        for relevant TB outcomes. Here you can define the 
-                                               shape of the background distributions for these inputs" , 
+                                        tags$p("4) Select Quality of Life (QoL)
+                                        for TB outcomes. Define the 
+                                               discount rate, time-horizon, and shape of the background distributions for QoL inputs  " , 
                                                style = "font-size:18px")),
                                 actionButton("qol_tab", "QoL", 
                                              icon = icon("staff-snake"),
                                              class = "light"))),
                 
-                
-                p("5) Choose a time-horizon for analysis in the slider below",style = "font-size:18px"),
-                
-                sliderInput("t_hor", "Time-horizon (years)", 2, 50, 5),
-
-
-                p("6) Choose a discount rate (applied to costs and QoL) in the slider below",style = "font-size:18px"),
-                
-                numericInput("disc_rate", em("Discount rate (0%-10%)"), 3.5, min = 0, 
-                             max = 100),
-                
+                br(),
                 
                 fluidRow(column(12, div(style="display: inline-block;",
-                                        tags$p("7) Run CEA analsys using the run 
+                                        tags$p("5) Run CEA analsys using the run 
                                         button in the ICER panel. Here you can 
-                                               download a report of your scenario" , 
+                                               download a report of your scenario  " , 
                                                style = "font-size:18px")),
                                 actionButton("icer_tab", "ICER", 
                                              icon = icon("bullseye"),
@@ -279,138 +271,130 @@ ui <- dashboardPage(
               
               tabsetPanel(type = "tabs", 
                           tabPanel("Demographics",
-              
-              fluidRow(
-                box(
-                  numericInput(inputId ="n", label="Cohort Size", value = 5000, min = 0, max = Inf),
-                ),
-                box(
-                  selectInput("country",label = "Choose country of origin",
-                              choices = c("Bangladesh","India","Lesotho" ,"Pakistan", "Uganda")),
-                )
-              ),
-              
-              fluidRow(
-                
-                box(
-                  title = "Age distribution (%)",
-                  sliderInput("age4", "65+", 0, 100, age_uk[4]),
-                  sliderInput("age3", "46-65", 0, 100, age_uk[3]),
-                  sliderInput("age2", "36-45 ", 0, 100, age_uk[2]),
-                  sliderInput("age1", "16-35 ", 0, 100, age_uk[1]),
-                  
-                  verbatimTextOutput('result'),
-                  tags$head(tags$style("#result{color: red}"
-                  )
-                  )
-                ),
-                
-                box(plotOutput("distPlot")),
-                
-              )),
-              
-              tabPanel("HIV prevalence",
-              
-              fluidRow(
-                box(
-                  title = "HIV prevalence (%)",
-                  sliderInput("hiv_prev4", "65+", 0, 100, 0),
-                  sliderInput("hiv_prev3", "46-65", 0, 100, 0),
-                  sliderInput("hiv_prev2", "36-45 ", 0, 100, 0),
-                  sliderInput("hiv_prev1", "16-35 ", 0, 100, 0),
-                ),
-                
-                
-                box(plotOutput("hiv_prevPlot")),
-                
-                
-              )),
-              
-              tabPanel("LTBI prevalence",
-              
-              fluidRow(
-                
-                box(
-                  title = "Expected TB infection prevalence (%)",
-                  sliderInput("prev4", "65+", 0, 100, prev_uk[4]),
-                  sliderInput("prev3", "46-65", 0, 100, prev_uk[3]),
-                  sliderInput("prev2", "36-45 ", 0, 100, prev_uk[2]),
-                  sliderInput("prev1", "16-35 ", 0, 100, prev_uk[1]),
-                ),
-                
-                box(plotOutput("prevPlot")),
-                
+                                   
+                                   fluidRow(
+                                     box(
+                                       numericInput(inputId ="n", label="Cohort Size", value = 5000, min = 0, max = Inf),
+                                     ),
+                                     box(
+                                       selectInput("country",label = "Choose country of origin",
+                                                   choices = c("Bangladesh","India","Lesotho" ,"Pakistan", "Uganda")),
+                                     )
+                                   ),
+                                   
+                                   fluidRow(
+                                     
+                                     box(
+                                       title = "Age distribution (%)",
+                                       sliderInput("age4", "65+", 0, 100, age_uk[4]),
+                                       sliderInput("age3", "46-65", 0, 100, age_uk[3]),
+                                       sliderInput("age2", "36-45 ", 0, 100, age_uk[2]),
+                                       sliderInput("age1", "16-35 ", 0, 100, age_uk[1]),
+                                       
+                                       verbatimTextOutput('result'),
+                                       tags$head(tags$style("#result{color: red}"
+                                       )
+                                       )
+                                     ),
+                                     
+                                     box(plotOutput("distPlot")),
+                                     
+                                   )),
+                          
+                          tabPanel("LTBI prevalence",
+                                   
+                                   fluidRow(
+                                     
+                                     box(
+                                       title = "Expected TB infection prevalence (%)",
+                                       sliderInput("prev4", "65+", 0, 100, prev_uk[4]),
+                                       sliderInput("prev3", "46-65", 0, 100, prev_uk[3]),
+                                       sliderInput("prev2", "36-45 ", 0, 100, prev_uk[2]),
+                                       sliderInput("prev1", "16-35 ", 0, 100, prev_uk[1]),
+                                     ),
+                                     
+                                     box(plotOutput("prevPlot")),
+                                     
+                                   )
+                          ),
+                          
+                          tabPanel("HIV prevalence",
+                                   
+                                   fluidRow(
+                                     box(
+                                       title = "Expected HIV prevalence (%)",
+                                       sliderInput("hiv_prev4", "65+", 0, 100, 0),
+                                       sliderInput("hiv_prev3", "46-65", 0, 100, 0),
+                                       sliderInput("hiv_prev2", "36-45 ", 0, 100, 0),
+                                       sliderInput("hiv_prev1", "16-35 ", 0, 100, 0),
+                                     ),
+                                     
+                                     
+                                     box(plotOutput("hiv_prevPlot")),
+                                     
+                                     
+                                   )),
+                          
               )
-              ))
       ),
       
       # UI single: LTBI casc ----------------------------------------------------
       tabItem(tabName = "cascade",
               
               fluidRow(
-                box(
-                  column(4,
-                         numericInput(inputId ="year_test", label="Year of test", value = 2020, min = 0, max = Inf),
-                  ),
-                  column(4,
-                         radioButtons("test", "Prefered test", tests),
-                  ),
-                  column(2,
-                         radioButtons("tpt", "Choose TPT regimen", c("6INH","3HP", "3RH")),
-                  )
-                ),
-                box(width = 4,
-                    checkboxGroupInput(inputId="age_tpt", 
-                                       label="Age groups eligible for TPT:",
-                                       choices=c(
-                                         "16-35" = "16-35",
-                                         "36-45" = "36-45",
-                                         "46-65" = "46-65",
-                                         "65+" = "65+"),
-                                       selected = c(
-                                         "36-45" = "36-45",
-                                         "46-65" = "46-65",
-                                         "65+" = "65+")),
-                )
-              ),
-              fluidRow(
                 valueBoxOutput(width=3,"tpt_effectiveness"),
                 
                 valueBoxOutput(width=3,"tpt_AE"),
                 
-                box(width = 2,
-                    checkboxInput("manualae", "Manually input adverse events", FALSE),
-                ),
-                conditionalPanel(
-                  condition = "input.manualae == 1",
-                  box(width = 2,
-                      numericInput("manualeamean", "% developing adverse events", value = 8, min = 0, max = 100),
-                  ),
-                )
               ),
               
-              
               fluidRow(
-                
-                box( width =6,
-                     column(5,
-                            sliderInput("casc1", "LTBI testing positive that start TPT (%)", 0, 100, 0)             
-                     ),
-                     
-                     column(5,
-                            sliderInput("casc2", "On TPT and completing their regimen (%) ", 0, 100, 0)
-                     )
+                box(
+                  column(2,
+                         numericInput(inputId ="year_test", label="Year of test", value = 2020, min = 0, max = Inf),
+                  ),
+                  column(3,
+                         selectInput("test",label = "Prefered test", choices = tests),
+                  ),
+                  column(3,
+                         selectInput("tpt", "Choose TPT regimen", c("6INH","3HP", "3RH")),
+                  ),
+                  column(3,
+                         checkboxGroupInput(inputId="age_tpt", 
+                                            label="TPT eligible age groups:",
+                                            choices=c(
+                                              "16-35" = "16-35",
+                                              "36-45" = "36-45",
+                                              "46-65" = "46-65",
+                                              "65+" = "65+"),
+                                            selected = c(
+                                              "36-45" = "36-45",
+                                              "46-65" = "46-65",
+                                              "65+" = "65+"))
+                         
+                  )
                 ),
-                
-                
+                box(
+                  checkboxInput("manualae", "Manually input adverse events", FALSE),
+                  
+                  conditionalPanel(
+                    condition = "input.manualae == 1",
+                    numericInput("manualeamean", "% developing adverse events", value = 8, min = 0, max = 100),
+                  ),
+                )
               ),
               
               fluidRow(
                 
                 box(
                   title = "LTBI testing and treatment cascade",
-                  plotOutput("cascadeplot"))
-              )
+                  plotOutput("cascadeplot")),
+                
+                box(
+                  sliderInput("casc1", "LTBI positive that start TPT (%)", 0, 100, 0),
+                  sliderInput("casc2", "TPT regimens completed (%) ", 0, 100, 0)
+                )
+              ),
               
       ),
       
@@ -420,115 +404,115 @@ ui <- dashboardPage(
               
               tabsetPanel(type = "tabs", 
                           tabPanel("LTBI test",
-              
-              # Tets cost
-              fluidRow(
-                box(width = 4,
-                    title="Unit cost of LTBI test (£)",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("costPERT1", height = "35vh")
-                    
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("testcost_dist", "", c("Gamma","PERT")),
-                ),
-                conditionalPanel(
-                  condition = "input.testcost_dist == 'PERT'",
-                  box(width = 3,
-                      numericInput("cost_test_pert", "Most likely", value = 50, min = 0, max = Inf),
-                      numericInput("cost_testmin_pert", "Min", value = 10, min = 0, max = Inf),
-                      numericInput("cost_testmax_pert", "Max", value = 70, min = 0, max = Inf),
-                      sliderInput("cost_testlam", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.testcost_dist == 'Gamma'",
-                  box(width = 3,
-                      numericInput("cost_test_gamma", "Mean", value = 50, min = 0, max = Inf),
-                      numericInput("cost_testsd_gamma", "SD", value = 10, min = 0, max = Inf)
-                  ),
-                )
-              )
+                                   
+                                   # Tets cost
+                                   fluidRow(
+                                     box(width = 4,
+                                         h3("Unit cost of LTBI test (£)"),
+                                         plotOutput("cost_test", height = "35vh")
+                                         
+                                     ),
+                                     box(
+                                       width = 4,
+                                       title="Select distribution to be used",
+                                       column(4,
+                                              radioButtons("testcost_dist", "", c("Gamma","PERT")),
+                                       ),
+                                       column(4,
+                                              conditionalPanel(
+                                                condition = "input.testcost_dist == 'PERT'",
+                                                numericInput("cost_test_pert", "Most likely", value = 50, min = 0, max = Inf),
+                                                numericInput("cost_testmin_pert", "Min", value = 10, min = 0, max = Inf),
+                                                numericInput("cost_testmax_pert", "Max", value = 70, min = 0, max = Inf),
+                                                sliderInput("cost_testlam", "Shape", value = 4, min = 0, max = 10)
+                                              ),
+                                              
+                                              conditionalPanel(
+                                                condition = "input.testcost_dist == 'Gamma'",
+                                                numericInput("cost_test_gamma", "Mean", value = 50, min = 0, max = Inf),
+                                                numericInput("cost_testsd_gamma", "SD", value = 10, min = 0, max = Inf)
+                                              ),
+                                       )
+                                     )
+                                   )
                           ),
-              
-              tabPanel("Test campaign",
-                       
-              # Campaign cost
-              fluidRow(  
-                box(width = 4,
-                    title="Overall cost (£) - Incurred only at start",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("costPERT2", height = "35vh")
-                    
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("campcost_dist", "", c("Gamma","PERT")),
-                ),
-                
-                conditionalPanel(
-                  condition = "input.campcost_dist == 'PERT'",
-                  box(width = 3,
-                      numericInput("cost_camp_pert", "Most likely", value = 1000, min = 0, max = Inf),
-                      numericInput("cost_campmin_pert", "Min", value = 800, min = 0, max = Inf),
-                      numericInput("cost_campmax_pert", "Max", value = 1200, min = 0, max = Inf),
-                      sliderInput("cost_camplam", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.campcost_dist == 'Gamma'",
-                  box(width = 3,
-                      numericInput("cost_camp_gamma", "Mean", value = 1000, min = 0, max = Inf),
-                      numericInput("cost_campsd_gamma", "SD", value = 200, min = 0, max = Inf)
-                  ),
-                )
-              )
-              ),
-              
-              
-              # cost TPT
-              tabPanel("TPT regimen",
-                       
-              fluidRow(  
-                box(width = 4,
-                    title="Unit Cost of completed TPT regimen (£)",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("costPERT3", height = "35vh")
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("tptcost_dist", "", c("Gamma","PERT")),
-                ),
-                conditionalPanel(
-                  condition = "input.tptcost_dist == 'PERT'",
-                  box(width = 3,
-                      numericInput("cost_tpt_pert", "Most likely", value = 1000, min = 0, max = Inf),
-                      numericInput("cost_tptmin_pert", "Min", value = 800, min = 0, max = Inf),
-                      numericInput("cost_tptmax_pert", "Max", value = 1200, min = 0, max = Inf),
-                      sliderInput("cost_tptlam", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.tptcost_dist == 'Gamma'",
-                  box(width = 3,
-                      numericInput("cost_tpt_gamma", "Mean", value = 1000, min = 0, max = Inf),
-                      numericInput("cost_tptsd_gamma", "SD", value = 200, min = 0, max = Inf)
-                  ),
-                )
-              ),
-              # LTFUP cost
-              fluidRow(  
-                box(
-                  title = "Proportion of TPT regimen cost incurred by those lost to follow-up (%) ",
-                  status = "primary", solidHeader = TRUE,
-                  sliderInput("cost_ltfup", "(%)", 0, 100, 0.5),
-                ),
-              ),
-              )
+                          
+                          tabPanel("Test campaign",
+                                   
+                                   # Campaign cost
+                                   fluidRow(  
+                                     box(width = 4,
+                                         h3("Overall cost (£) - Incurred only at start"),
+                                         plotOutput("cost_campaign", height = "35vh")
+                                         
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("campcost_dist", "", c("Gamma","PERT")),
+                                         ),
+                                         column(4,
+                                                
+                                                conditionalPanel(
+                                                  condition = "input.campcost_dist == 'PERT'",
+                                                  numericInput("cost_camp_pert", "Most likely", value = 1000, min = 0, max = Inf),
+                                                  numericInput("cost_campmin_pert", "Min", value = 800, min = 0, max = Inf),
+                                                  numericInput("cost_campmax_pert", "Max", value = 1200, min = 0, max = Inf),
+                                                  sliderInput("cost_camplam", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.campcost_dist == 'Gamma'",
+                                                  numericInput("cost_camp_gamma", "Mean", value = 1000, min = 0, max = Inf),
+                                                  numericInput("cost_campsd_gamma", "SD", value = 200, min = 0, max = Inf)
+                                                ),
+                                         )
+                                     )
+                                   )
+                          ),
+                          
+                          
+                          # cost TPT
+                          tabPanel("TPT regimen",
+                                   
+                                   fluidRow(  
+                                     box(width = 4,
+                                         h3("Unit Cost of completed TPT regimen (£)"),
+                                         plotOutput("cost_tpt", height = "35vh")
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("tptcost_dist", "", c("Gamma","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.tptcost_dist == 'PERT'",
+                                                  numericInput("cost_tpt_pert", "Most likely", value = 1000, min = 0, max = Inf),
+                                                  numericInput("cost_tptmin_pert", "Min", value = 800, min = 0, max = Inf),
+                                                  numericInput("cost_tptmax_pert", "Max", value = 1200, min = 0, max = Inf),
+                                                  sliderInput("cost_tptlam", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.tptcost_dist == 'Gamma'",
+                                                  numericInput("cost_tpt_gamma", "Mean", value = 1000, min = 0, max = Inf),
+                                                  numericInput("cost_tptsd_gamma", "SD", value = 200, min = 0, max = Inf)
+                                                ),
+                                         )
+                                     )
+                                   ),
+                                   # LTFUP cost
+                                   fluidRow(  
+                                     box(
+                                       width=4,
+                                       h3("Unit Cost of TPT regimen in LTFUP (£)"),
+                                       plotOutput("cost_ltfup_tpt", height = "35vh")
+                                     ),
+                                     box(
+                                       width=4,
+                                       sliderInput("cost_ltfup", "Proportion of TPT regimen cost incurred by those lost to follow-up (%)" , 0, 100, 0.5),
+                                     ),
+                                   ),
+                          )
               )
               
       ),
@@ -539,158 +523,181 @@ ui <- dashboardPage(
               tabsetPanel(type = "tabs", 
                           tabPanel("Baseline QoL",
                                    
-              fluidRow(
-                
-                box(
-                  title = "Baseline Quality of Life (QoL) by age",
-                  status = "primary", solidHeader = TRUE,
-                  plotOutput("fullQOL_Plot")),
-                
-                box(
-                  sliderInput("qolfull_1", "16-35 ", 0, 1, qol_full[1]),
-                  sliderInput("qolfull_2", "36-45 ", 0, 1, qol_full[2]),
-                  sliderInput("qolfull_3", "46-65", 0, 1, qol_full[3]),
-                  sliderInput("qolfull_4", "65+", 0, 1, qol_full[4])
-                )
-              )
-              ),
-              
-              # PTB QoL
-              tabPanel("Pulmonary TB",
-                       
-              fluidRow(
-                box(width = 4,
-                    title="QALY loss due to pulmonary TB disease",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("qolPERT1", height = "35vh")
-                    
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("ptbqol_dist", "", c("Beta","PERT")),
-                ),
-                conditionalPanel(
-                  condition = "input.ptbqol_dist == 'PERT'",
-                  box(width = 3,
-                      sliderInput("qol_ptb_pert", "Most likely", value = 0.0838, min = 0, max = 1),
-                      sliderInput("qol_ptbmin_pert", "Min", value = 0.06, min = 0, max = 1),
-                      sliderInput("qol_ptbmax_pert", "Max", value = 0.1, min = 0, max = 1),
-                      sliderInput("qol_ptblam_pert", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.ptbqol_dist == 'Beta'",
-                  box(width = 3,
-                      sliderInput("qol_ptb_beta", "Mean", value = 0.0838, min = 0, max = 1),
-                      sliderInput("qol_ptbsd_beta", "SD", value = 0.016, min = 0, max = 1)
-                  ),
-                )
-              )
-              ),
-              
-              tabPanel("Extra-pulmonary TB",
-                       
-              # EPTB QoL
-              fluidRow(
-                box(width = 4,
-                    title="QALY loss due to Extra-pulmonary TB disease",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("qolPERT2", height = "35vh")
-                    
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("eptbqol_dist", "", c("Beta","PERT")),
-                ),
-                conditionalPanel(
-                  condition = "input.eptbqol_dist == 'PERT'",
-                  box(width = 3,
-                      sliderInput("qol_eptb_pert", "Most likely", value = 0.05, min = 0, max = 1),
-                      sliderInput("qol_eptbmin_pert", "Min", value = 0.02, min = 0, max = 1),
-                      sliderInput("qol_eptbmax_pert", "Max", value = 0.08, min = 0, max = 1),
-                      sliderInput("qol_eptblam_pert", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.eptbqol_dist == 'Beta'",
-                  box(width = 3,
-                      sliderInput("qol_eptb_beta", "Mean", value = 0.05, min = 0, max = 1),
-                      sliderInput("qol_eptbsd_beta", "SD", value = 0.01, min = 0, max = 1)
-                  ),
-                )
-              )
-              ),
-              
-              tabPanel("Post-TB",
-                       
-              # QoL postTB
-              
-              fluidRow(
-                box(width = 4,
-                    title="QALY loss due Post-TB Lung disease",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("qolPERT3", height = "35vh")
-                    
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("postqol_dist", "", c("Beta","PERT")),
-                ),
-                conditionalPanel(
-                  condition = "input.postqol_dist == 'PERT'",
-                  box(width = 3,
-                      sliderInput("qol_post_pert", "Most likely", value = 0.03, min = 0, max = 1),
-                      sliderInput("qol_postmin_pert", "Min", value = 0.01, min = 0, max = 1),
-                      sliderInput("qol_postmax_pert", "Max", value = 0.1, min = 0, max = 1),
-                      sliderInput("qol_postlam_pert", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.postqol_dist == 'Beta'",
-                  box(width = 3,
-                      sliderInput("qol_post_beta", "Mean", value = 0.03, min = 0, max = 1),
-                      sliderInput("qol_postsd_beta", "SD", value = 0.01, min = 0, max = 1)
-                  ),
-                )
-              )
-              ),
-              
-              # QoL TPT Adevrese events (AE)
-              tabPanel("TPT adverse events",
-                       
-              fluidRow(
-                box(width = 4,
-                    title="QALY loss due adverse events (AE) from TPT",
-                    status = "primary", solidHeader = TRUE,
-                    plotOutput("qolPERT4", height = "35vh")
-                    
-                ),
-                box(width = 2,
-                    title="Select distribution to be used",
-                    status = "info", solidHeader = FALSE,
-                    radioButtons("aeqol_dist", "", c("Beta","PERT")),
-                ),
-                conditionalPanel(
-                  condition = "input.aeqol_dist == 'PERT'",
-                  box(width = 3,
-                      numericInput("qol_ae_pert", "Most likely", value = 0.0046, min = 0, max = 1),
-                      numericInput("qol_aemin_pert", "Min", value = 0.001, min = 0, max = 1),
-                      numericInput("qol_aemax_pert", "Max", value = 0.1, min = 0, max = 1),
-                      sliderInput("qol_aelam_pert", "Shape", value = 4, min = 0, max = 10)
-                  ),
-                ),
-                conditionalPanel(
-                  condition = "input.aeqol_dist == 'Beta'",
-                  box(width = 3,
-                      numericInput("qol_ae_beta", "Mean", value = 0.0046, min = 0, max = 1),
-                      numericInput("qol_aesd_beta", "SD", value = 0.001, min = 0, max = 1)
-                  ),
-                )
-              )
-              )
+                                   
+                                   fluidRow(
+                                     
+                                     box(
+                                       title = "Baseline Quality of Life (QoL) by age",
+                                       
+                                       plotOutput("fullQOL_Plot")),
+                                     
+                                     box(
+                                       sliderInput("qolfull_1", "16-35 ", 0, 1, qol_full[1]),
+                                       sliderInput("qolfull_2", "36-45 ", 0, 1, qol_full[2]),
+                                       sliderInput("qolfull_3", "46-65", 0, 1, qol_full[3]),
+                                       sliderInput("qolfull_4", "65+", 0, 1, qol_full[4])
+                                     )
+                                   )
+                          ),
+                          # Excess mortality QoL loss
+                          tabPanel("Excess deaths QoL losses",
+                                   fluidRow(
+                                   column(3,
+                                     h3("QALY loss due to TB death "),
+                                     br(),
+                                   tableOutput("agetab"),
+                                   ),
+                                   column(3,
+                                    br(),
+                                    br(),
+                                    br(),
+                                    sliderInput("t_hor", em("Time-horizon (years)"), 2, 25, 10),
+                                    br(),
+                                   numericInput("disc_rate", em("Select discount rate (0%-10%)"), 3.5, min = 0, max = 100, step = 0.1)
+                                   )
+                                   ),
+                                   br(),
+                                   h5("Abbreviations: LE - Life Expectancy, QALE - Quality Adjusted Life Expectancy, dQALY - Discounted Quality Adjusted Life Years"),
+                                   br(),
+                                   h6("Notes:"),
+                                   h6("1. This table reflects QALY losses from excess deaths only"),
+                                   h6("2. It is an adaptation of the 'COVID19 QALY App' by N.R Naylor. See here:",span(tags$a(href="https://github.com/LSHTM-CHIL/COVID19_QALY_App", 
+                              "https://github.com/LSHTM-CHIL/COVID19_QALY_App"),style = "color:blue")),
+                                   h6("3. In this adaptation we do not consider the effect of comorbidities in either mortality and disability ")
+
+                          ),
+                          
+                          
+                          
+                          
+                          
+                          
+                          # PTB QoL
+                          tabPanel("Pulmonary TB",
+                                   
+                                   fluidRow(
+                                     box(width = 4,
+                                         h3("QALY loss due to pulmonary TB disease"),
+                                         plotOutput("qolPERT1", height = "35vh")
+                                     ),
+                                     
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("ptbqol_dist", "", c("Beta","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.ptbqol_dist == 'PERT'",
+                                                  sliderInput("qol_ptb_pert", "Most likely", value = 0.0838, min = 0, max = 1),
+                                                  sliderInput("qol_ptbmin_pert", "Min", value = 0.06, min = 0, max = 1),
+                                                  sliderInput("qol_ptbmax_pert", "Max", value = 0.1, min = 0, max = 1),
+                                                  sliderInput("qol_ptblam_pert", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.ptbqol_dist == 'Beta'",
+                                                  sliderInput("qol_ptb_beta", "Mean", value = 0.0838, min = 0, max = 1),
+                                                  sliderInput("qol_ptbsd_beta", "SD", value = 0.016, min = 0, max = 1)
+                                                ),
+                                         )
+                                     )
+                                   )
+                          ),
+                          
+                          tabPanel("Extra-pulmonary TB",
+                                   
+                                   # EPTB QoL
+                                   fluidRow(
+                                     box(width = 4,
+                                         h3("QALY loss due to Extra-pulmonary TB disease"),
+                                         plotOutput("qolPERT2", height = "35vh")
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("eptbqol_dist", "", c("Beta","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.eptbqol_dist == 'PERT'",
+                                                  sliderInput("qol_eptb_pert", "Most likely", value = 0.05, min = 0, max = 1),
+                                                  sliderInput("qol_eptbmin_pert", "Min", value = 0.02, min = 0, max = 1),
+                                                  sliderInput("qol_eptbmax_pert", "Max", value = 0.08, min = 0, max = 1),
+                                                  sliderInput("qol_eptblam_pert", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.eptbqol_dist == 'Beta'",
+                                                  sliderInput("qol_eptb_beta", "Mean", value = 0.05, min = 0, max = 1),
+                                                  sliderInput("qol_eptbsd_beta", "SD", value = 0.01, min = 0, max = 1)
+                                                ),
+                                         )
+                                     )
+                                   )
+                          ),
+                          
+                          tabPanel("Post-TB",
+                                   
+                                   # QoL postTB
+                                   
+                                   fluidRow(
+                                     box(width = 4,
+                                         h3("QALY loss due Post-TB Lung disease"),
+                                         plotOutput("qolPERT3", height = "35vh")
+                                         
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("postqol_dist", "", c("Beta","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.postqol_dist == 'PERT'",
+                                                  sliderInput("qol_post_pert", "Most likely", value = 0.03, min = 0, max = 1),
+                                                  sliderInput("qol_postmin_pert", "Min", value = 0.01, min = 0, max = 1),
+                                                  sliderInput("qol_postmax_pert", "Max", value = 0.1, min = 0, max = 1),
+                                                  sliderInput("qol_postlam_pert", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.postqol_dist == 'Beta'",
+                                                  sliderInput("qol_post_beta", "Mean", value = 0.03, min = 0, max = 1),
+                                                  sliderInput("qol_postsd_beta", "SD", value = 0.01, min = 0, max = 1)
+                                                ),
+                                         )
+                                     )
+                                   )
+                          ),
+                          
+                          # QoL TPT Adevrese events (AE)
+                          tabPanel("TPT adverse events",
+                                   
+                                   fluidRow(
+                                     box(width = 4,
+                                         h3("QALY loss due adverse events (AE) from TPT"),
+                                         plotOutput("qolPERT4", height = "35vh")
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("aeqol_dist", "", c("Beta","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.aeqol_dist == 'PERT'",
+                                                  numericInput("qol_ae_pert", "Most likely", value = 0.0046, min = 0, max = 1),
+                                                  numericInput("qol_aemin_pert", "Min", value = 0.001, min = 0, max = 1),
+                                                  numericInput("qol_aemax_pert", "Max", value = 0.1, min = 0, max = 1),
+                                                  sliderInput("qol_aelam_pert", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.aeqol_dist == 'Beta'",
+                                                  numericInput("qol_ae_beta", "Mean", value = 0.0046, min = 0, max = 1),
+                                                  numericInput("qol_aesd_beta", "SD", value = 0.001, min = 0, max = 1)
+                                                ),
+                                         )
+                                     )
+                                   )
+                          )
               )
               
       ),
@@ -866,7 +873,7 @@ server <- function(input, output,session) {
     updateTabItems(session, "sidebar", "res_icer")
   })
   
-
+  
   # Read input tables ------------------------------------------------------------
   
   dfprev <- reactive({ 
@@ -991,10 +998,8 @@ server <- function(input, output,session) {
       )+
       theme_minimal()+
       theme(
+        text = element_text(size=20),
         legend.position = "none",
-        axis.text = element_text(colour = "black", size = 12, face = "bold"),
-        axis.title = element_text(size = 12, face = "bold"),
-        plot.title = element_text(size = 18, face = "bold"),
       )
   })
   
@@ -1018,10 +1023,8 @@ server <- function(input, output,session) {
       )+
       theme_minimal()+
       theme(
+        text = element_text(size=20),
         legend.position = "none",
-        axis.text = element_text(colour = "black", size = 12, face = "bold"),
-        axis.title = element_text(size = 12, face = "bold"),
-        plot.title = element_text(size = 18, face = "bold"),
       )
   })
   # Prev plot
@@ -1043,10 +1046,8 @@ server <- function(input, output,session) {
       )+
       theme_minimal()+
       theme(
+        text = element_text(size=20),
         legend.position = "none",
-        axis.text = element_text(colour = "black", size = 12, face = "bold"),
-        axis.title = element_text(size = 12, face = "bold"),
-        plot.title = element_text(size = 18, face = "bold"),
       )
   })
   
@@ -1154,7 +1155,7 @@ server <- function(input, output,session) {
   # Costs tab contents ------------------------------------------------------
   
   
-  output$costPERT1<- renderPlot({
+  output$cost_test<- renderPlot({
     
     n<-input$n
     
@@ -1182,7 +1183,7 @@ server <- function(input, output,session) {
     
   })
   
-  output$costPERT2<- renderPlot({
+  output$cost_campaign<- renderPlot({
     
     n<-input$n
     
@@ -1211,7 +1212,7 @@ server <- function(input, output,session) {
     
   })
   
-  output$costPERT3<- renderPlot({
+  output$cost_tpt<- renderPlot({
     
     
     n<-input$n
@@ -1241,6 +1242,52 @@ server <- function(input, output,session) {
   })
   
   
+  output$cost_ltfup_tpt<- renderPlot({
+    
+    
+    n<-input$n
+    ltfup<-input$cost_ltfup/100
+    
+    if (input$tptcost_dist =="Gamma"){
+      xmean<-input$cost_tpt_gamma
+      # xmin<-input$cost_tptmin_gamma
+      # xmax<-input$cost_tptmax_gamma
+      sd<- input$cost_tptsd_gamma#(xmax-xmin)/3.92 
+      shape<- (xmean^2)/(sd^2)
+      x  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$tptcost_dist =="PERT"){
+      
+      xmean<-input$cost_tpt_pert
+      xmin<-input$cost_tptmin_pert
+      xmax<-input$cost_tptmax_pert
+      lam<- input$cost_tptlam
+      x<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    if (ltfup==0){
+      hist(x*ltfup,
+           20,
+           main = " ",
+           xlim = c(0,1),
+           xlab = "£",
+           col = "gold2")
+    }else {
+      hist(x*ltfup,
+           20,
+           main = " ",
+           xlab = "£",
+           col = "gold2")
+      
+    }
+    
+  })
+  
+  
+  
+  
+  
+  
+  
   
   
   # QoL content -------------------------------------------------------------
@@ -1267,10 +1314,8 @@ server <- function(input, output,session) {
       )+
       theme_minimal()+
       theme(
+        text = element_text(size=20),
         legend.position = "none",
-        axis.text = element_text(colour = "black", size = 12, face = "bold"),
-        axis.title = element_text(size = 12, face = "bold"),
-        plot.title = element_text(size = 18, face = "bold"),
       )
   })
   
@@ -1857,7 +1902,7 @@ server <- function(input, output,session) {
   
   # Reactive dependencies - if these change then MODEL will run again and update values
   xxchange <- reactive({
-    paste(input$disc_rate)
+    paste(input$disc_rate, input$t_hor)
   })
   
   
@@ -1866,14 +1911,15 @@ server <- function(input, output,session) {
     smr <- 1#input$smr
     qcm <- 1
     r <- input$disc_rate/100
-  
+    time_horizon<-input$t_hor
+    
     shiny::validate(
       need(input$disc_rate <=10, "Please choose a valid discount rate between 0% and 10%"),
       need(input$disc_rate >=0, "Please choose a valid discount rate between 0% and 10%"),
     )
-
-    myvector <- c("Age",country)
     
+    myvector <- c("Age",country)
+   
     l_x_est <- function(dt, countr, smr){
       ## dt = data table with q(x) vaues
       ## country = selected country
@@ -1948,44 +1994,34 @@ server <- function(input, output,session) {
     temp.q_copy[ , b_x := z_x/((1+r))^(x.x-(column_label))] ## n.b x.x = u and column_label = x in the corresponding formulae in the CodeBook
     
     
-    total.b <- temp.q_copy[,.(bigb_x=sum(b_x)), by=column_label]
+    total.b <- temp.q_copy[,.(bigb_x=sum(b_x[1:time_horizon])), by=column_label]
+    
     colnames(total.b) <- c("x.x","bigb_x")
     qale <- merge(qale, total.b, by="x.x")
     
     qale[ , dQALY := bigb_x/l_person]
     
     ######### calculating covid19 loss #######
-    myvector.cov <- c("low","high",country)
-    
-    dt.cov <- covid.age[, ..myvector.cov]
-    colnames(dt.cov) <- c("low","high","cov_age")
-    
-    dt.cov[ , midpoint := ceiling((low+high)/2)]
-    cov <- merge(qale, dt.cov, by.x="x.x", by.y="midpoint", all=FALSE)
-    
-    cov[ , weight.LE := cov_age*LE_x]
-    cov[ , weight.qale := cov_age*qale_x]
-    cov[ , weight.qaly := cov_age*dQALY]
-    
-    estimates <- colSums(cov)
-    resultstab <- data.table("Weighted LE Loss"=estimates["weight.LE"],
-                             "Weighted QALE Loss"=estimates["weight.qale"],
-                             "Weighted dQALY loss"=estimates["weight.qaly"])
+  
+
+    age_bands[ , midpoint := ceiling((low+high)/2)]
+   
+    cov <- merge(qale, age_bands, by.x="x.x", by.y="midpoint", all=FALSE)
+
     ### ADDING AGE GROUP BREAKDOWN TABLE
     cov[,"Age Group":=paste(cov[,low],cov[,high],sep="-")]
-    cov[ , "Age at Death (% of all deaths)" := cov_age*100]
     setnames(cov, old=c("LE_x","qale_x","dQALY"),
              new=c("LE","QALE","dQALY"))
     
-    agetab <- cov[ , c("Age Group","Age at Death (% of all deaths)",
+    agetab <- cov[ , c("Age Group",
                        "LE","QALE","dQALY")]
-
-    list(resultstab=resultstab, agetab=agetab)
+    
+    list( agetab=agetab)
   })
   
   
-
-
+  output$agetab <- renderTable(QoLmodel()$agetab, bordered = TRUE)
+  
   # Single run ICER object -----------------------------------------------------
   
   
@@ -1994,7 +2030,7 @@ server <- function(input, output,session) {
   
   
   icer_object <- eventReactive(input$add,{
-
+    
     
     #req(input$t_hor)
     set.seed(131)
@@ -2148,8 +2184,8 @@ server <- function(input, output,session) {
       sim_tpt_cost<-rpert(n,xmin,xmax,xmean,lam)
     }
     
-
-
+    
+    
     
     
     
@@ -2168,8 +2204,8 @@ server <- function(input, output,session) {
     frac_post<-0.25
     
     
-    qol<- QoLmodel()$agetab
-   browser()
+    qol_tab<- QoLmodel()$agetab
+ 
     
     # TB QOL
     qol_tb<- 0
@@ -2422,19 +2458,96 @@ server <- function(input, output,session) {
       
     }
     
+    
+    
+    
+    
+    # 
+    # 
+    # # Use mean and SD of predictions to generate new and different probabilities 
+    # # for each cohort individual
+    # 
+    # # Function to generate random number for each element
+    # generate_random_numbers <- function(a, b) {
+    #   rnorm(1, mean = b, sd = a)
+    # }
+    # 
+    # # Apply the function to matrices A and B using mapply
+    # C <- mapply(generate_random_numbers, predictions_sd, predictions)
+    # 
+    # # Convert the resulting vector C back to a matrix with the same dimensions as A and B
+    # probs_history <- matrix(C, nrow = nrow(predictions_sd), ncol = ncol(predictions_sd))
+    # 
+    # # Simulate (binomial) the Tb cases according to probability in time
+    # # The result is history of 0s and 1s for each cohort member, 
+    # # where the column dimension is each year of the time_horizon
+    # 
+    # 
+    # 
+    # p<-matrix(runif(cohort_size*time_horizon), nrow=cohort_size)
+    # logical_matrix <- p < probs_history
+    # 
+    # which(rowSums(logical_matrix) >1)
+    # 
+    # 
+    # # Function to keep only the first TRUE in each row
+    # keep_first_true <- function(row) { # Infection only occurs once in timeline
+    #   idx <- which(row)
+    #   if (length(idx) > 0) {
+    #     row[-idx[1]] <- FALSE
+    #   }
+    #   return(row)
+    # }
+    # 
+    # # Apply the function to each row of the logical matrix
+    # cases_history <- t(apply(logical_matrix, 1, keep_first_true)) * 1
+    # 
+    # browser()
+    # tmp<-data.frame(age=base1$agespl1,cases_history)
+    # 
+    # sim_cases_age<-tmp %>%
+    #   group_by(age) %>%
+    #   summarise(across(everything(), ~ sum(., na.rm = TRUE)))
+    # 
+    # 
+    # 
+    # fullqol_byage<-table(base1$agespl1)*dfqol$value
+    # 
+    # 
+    # tmp<-t(matrix(rbinom(length(m_prob),prob=m_prob,size=1),
+    #                   nrow=nrow(m_prob)))
+    # 
+    # tmp<-data.frame(age=base1$agespl1,tmp)
+    # 
+    # sim_cases_age<-tmp %>%
+    #   group_by(age) %>%
+    #   summarise(across(everything(), ~ sum(., na.rm = TRUE)))
+    # 
+    # sim_cases<- as.matrix(sim_cases_age %>% 
+    #   summarise(across(everything(), ~ sum(., na.rm = TRUE))) %>% 
+    #   select(!age))
+    # 
+    # fullqol_byage<-table(base1$agespl1)*dfqol$value
+    # 
+    # 
+    
+    
+    
     mean_prob_tb<-predictions[,time_horizon]
     sd_prob_tb<-predictions_sd[,time_horizon]
     tb_prob<-rnorm(mean_prob_tb,mean_prob_tb,sd_prob_tb)
     tb_prob[which(tb_prob<0)]<-0
-    m_prob<-matrix(replicate(n_samples,tb_prob),n_samples)
+    m_prob<-t(replicate(n_samples,tb_prob))
+    
     
     sim_cases<-matrix(rbinom(length(m_prob),prob=m_prob,size=1),
                       nrow=nrow(m_prob)) %>% rowSums()
+
+    
     
     sim_cases_itv<-(sim_cases * tpt_eff)
     
     
-    #browser()
     deaths<-rbinom(sim_cases,sim_cases,cfr)
     deaths_itv<-rbinom(sim_cases_itv,sim_cases,cfr)
     
