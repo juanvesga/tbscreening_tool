@@ -1,6 +1,7 @@
 
 
 rm(list = ls()) 
+gc()
 
 require(shiny)
 require(shinythemes)
@@ -20,7 +21,7 @@ library(data.table)
 library(BCEA)
 library(ggplot2)
 library(purrr)
-
+library(matrixStats)
 
 
 # path_app<-rstudioapi::getSourceEditorContext()$path
@@ -79,6 +80,8 @@ test<-"quantiferon" # tst or tspot
 year_test <- 2019
 country <- "Pakistan"
 time_horizon<-20
+
+
 
 
 ## Costs
@@ -393,7 +396,7 @@ ui <- dashboardPage(
                 
                 box(
                   sliderInput("casc1", "LTBI positive that start TPT (%)", 0, 100, 100),
-                  sliderInput("casc2", "TPT regimens completed (%) ", 0, 100, 80)
+                  sliderInput("casc2", "TPT regimens completed (%) ", 0, 100, 90)
                 )
               ),
               
@@ -685,15 +688,15 @@ ui <- dashboardPage(
                                          column(4,
                                                 conditionalPanel(
                                                   condition = "input.aeqol_dist == 'PERT'",
-                                                  numericInput("qol_ae_pert", "Most likely", value = 0.2, min = 0, max = 1),
-                                                  numericInput("qol_aemin_pert", "Min", value = 0.15, min = 0, max = 1),
-                                                  numericInput("qol_aemax_pert", "Max", value = 0.25, min = 0, max = 1),
+                                                  numericInput("qol_ae_pert", "Most likely", value = 0.0046, min = 0, max = 1),
+                                                  numericInput("qol_aemin_pert", "Min", value = 0.0015, min = 0, max = 1),
+                                                  numericInput("qol_aemax_pert", "Max", value = 0.01, min = 0, max = 1),
                                                   sliderInput("qol_aelam_pert", "Shape", value = 4, min = 0, max = 10)
                                                 ),
                                                 conditionalPanel(
                                                   condition = "input.aeqol_dist == 'Beta'",
-                                                  numericInput("qol_ae_beta", "Mean", value = 0.2, min = 0, max = 1),
-                                                  numericInput("qol_aesd_beta", "SD", value = 0.05, min = 0, max = 1)
+                                                  numericInput("qol_ae_beta", "Mean", value = 0.0046, min = 0, max = 1),
+                                                  numericInput("qol_aesd_beta", "SD", value = 0.0001, min = 0, max = 1)
                                                 ),
                                          )
                                      )
@@ -756,6 +759,19 @@ ui <- dashboardPage(
                                      box(
                                        plotOutput("plot_wtp")
                                      )
+                                   )
+                          ),
+                          
+                          #INB
+                          tabPanel("INB",
+                                   fluidPage(
+                                     br(),
+                                     br(),
+                                     plotOutput("plot_INB"),
+                                     br(),
+                                     h5("Abbreviations: WTP (£/QALY) - Willingness to pay per QALY"),
+                                     br(),
+                                     
                                    )
                           ),
                           
@@ -870,6 +886,7 @@ ui <- dashboardPage(
 
 
 # server Function ------------------------------------------------------------------
+
 
 
 server <- function(input, output,session) {
@@ -2097,7 +2114,8 @@ server <- function(input, output,session) {
     tpt_compl<-input$casc2/100
     tpt_cost_lfup<-input$cost_ltfup
     dr<-input$disc_rate/100
-    cfr<- 0.052
+    #CFR Crofts et al2008
+    cfr <- c(0.012,0.012,0.048,0.176)
     frac_eptb<-0.2
     av_tbdur <- 2
     frac_post<-0.25 # https://karger.com/res/article/100/8/751/820992/Post-Tuberculosis-Lung-Disease-Clinical-Review-of
@@ -2473,39 +2491,42 @@ server <- function(input, output,session) {
     # Use mean and SD of predictions to generate new and different probabilities
     # for each cohort individual
     
+
+    
     # Function to generate random number for each element
-    generate_random_numbers <- function(a, b) {
-      rnorm(1, mean = b, sd = a)
-    }
-    
-    # Apply the function to matrices A and B using mapply
-    C <- mapply(generate_random_numbers, predictions_sd, predictions)
-    
-    # Convert the resulting vector C back to a matrix with the same dimensions as A and B
-    probs_history <- matrix(C, nrow = nrow(predictions_sd), ncol = ncol(predictions_sd))
-    
-    # Simulate (binomial) the Tb cases according to probability in time
-    # The result is history of 0s and 1s for each cohort member,
-    # where the column dimension is each year of the time_horizon
+    # generate_random_numbers <- function(a, b) {
+    #   rnorm(1, mean = b, sd = a)
+    # }
+    # 
+    # # Apply the function to matrices A and B using mapply
+    # C <- mapply(generate_random_numbers, predictions_sd, predictions)
+    # 
+    # 
+    # # Convert the resulting vector C back to a matrix with the same dimensions as A and B
+    # probs_history <- matrix(C, nrow = nrow(predictions_sd), ncol = ncol(predictions_sd))
+    # 
+    # # Simulate (binomial) the Tb cases according to probability in time
+    # # The result is history of 0s and 1s for each cohort member,
+    # # where the column dimension is each year of the time_horizon
     
     p<-matrix(runif(cohort_size*time_horizon), nrow=cohort_size)
-    logical_matrix <- p < probs_history
+    logical_matrix <- p < predictions
     
     
     # Function to keep only the first TRUE in each row
-    keep_first_true <- function(row) { # Infection only occurs once in timeline
-      idx <- which(row)
-      if (length(idx) > 0) {
-        row[-idx[1]] <- FALSE
-      }
-      return(row)
-    }
-    
-    # Apply the function to each row of the logical matrix
-    cases_history <- t(apply(logical_matrix, 1, keep_first_true)) * 1
-    
-    
-    #tmp<-data.frame(age=base1$agespl1,cases_history)
+    # keep_first_true <- function(row) { # Infection only occurs once in timeline
+    #   idx <- which(row)
+    #   if (length(idx) > 0) {
+    #     row[-idx[1]] <- FALSE
+    #   }
+    #   return(row)
+    # }
+    # 
+    # # Apply the function to each row of the logical matrix
+    # cases_history <- t(apply(logical_matrix, 1, keep_first_true)) * 1
+    # 
+    # 
+    # #tmp<-data.frame(age=base1$agespl1,cases_history)
     
     
     tmp<-data.frame(age=base1$agespl1,logical_matrix*1)
@@ -2515,9 +2536,9 @@ server <- function(input, output,session) {
     sim_cases_age<-tmp %>%
       group_by(age) %>%
       summarise(across(everything(), ~ sum(., na.rm = TRUE)))
-    
+  
     # Draw TB deaths from cases
-    exp_prob<-matrix(cfr,nrow = nrow(sim_cases_age), ncol = ncol(logical_matrix) )
+    exp_prob<-replicate(time_horizon,cfr) 
     
     binom_draw<- function(n,p){
       rbinom(n=1, size=n, prob=p)
@@ -2560,60 +2581,96 @@ server <- function(input, output,session) {
     tmp<-matrix(1,nrow = 1, ncol=time_horizon)
     
     discount_matrix<-((tmp)/((1 + dr)^ seq_len(ncol(tmp)) ))
+    qol_exp<-matrix(rep(qol,n_samples), nrow = nrow(sim_cases_age_ptb_itv), ncol = time_horizon )
+    
+
+    
+    qaly_loss_ptb <- t(t(discount_matrix * colSums(sim_cases_age_ptb))  %*%   (sim_tb_qol * av_tbdur))
+    qaly_loss_eptb<- t(t(discount_matrix * colSums(sim_cases_age_eptb))  %*%   (sim_eptb_qol * av_tbdur))
+    qaly_loss_ptb_itv <- t(t(discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv)))  %*%   (sim_tb_qol * av_tbdur))
+    qaly_loss_eptb_itv<- t(t(discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv)))  %*%   (sim_eptb_qol * av_tbdur))
+    qaly_loss_post <-t(colSums((sim_cases_age_ptb - sim_deaths)* frac_post * qol)  %*% t(sim_post_qol)) 
+    qaly_loss_post_itv <-t(colSums(as.data.frame((sim_cases_age_ptb_itv - sim_deaths_itv)* frac_post * qol))  %*% t(sim_post_qol)) 
+    qaly_loss_AE_itv<- npositives * tpt_cov  * tpt_ae * sim_ae_qol
+    
+    deaths_loss<-t(replicate(n_samples,qaly_loss_deaths)) 
+    deaths_loss_itv<-t(replicate(n_samples,qaly_loss_deaths_itv)) 
+    
+    qaly<-     sum(baseline_qaly)- (qaly_loss_ptb + qaly_loss_eptb + qaly_loss_post + deaths_loss) 
+    qaly_itv<- sum(baseline_qaly)- (qaly_loss_ptb_itv + qaly_loss_eptb_itv + 
+                                      qaly_loss_post_itv + deaths_loss_itv+qaly_loss_AE_itv) 
+    
+    qaly_margin<-qaly_itv-qaly
+    
+    #Costs
+    
+    tbtx_cost<- t(replicate(n_samples, drop(discount_matrix) * drop(colSums(sim_cases_age))*  tbtx_cost_yr)) 
+    tbtx_cost_itv<- t(replicate(n_samples, drop(discount_matrix) * drop(colSums(sim_cases_age_itv))*  tbtx_cost_yr)) 
+    
+    
+    itv_start_cost<-replicate(time_horizon, sim_test_cost * cohort_size + 
+      npositives * tpt_cov * tpt_compl * sim_tpt_cost + 
+      npositives * tpt_cov * (1-tpt_compl) * sim_tpt_cost * tpt_cost_lfup + sim_camp_cost)
     
     
     
-    for (ii in 1:n_samples){
-      
-      qaly_loss_ptb <- discount_matrix * colSums(sim_cases_age_ptb * sim_tb_qol[ii] * av_tbdur)
-      qaly_loss_eptb <- discount_matrix *colSums(sim_cases_age_eptb * sim_eptb_qol[ii] * av_tbdur)
-      
-      
-      qaly_loss_ptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv * 
-                                                                     sim_tb_qol[ii] * av_tbdur))
-      
-      
-      qaly_loss_eptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv * 
-                                                                      sim_eptb_qol[ii] * av_tbdur))
-      
-      qaly_loss_post<- colSums((sim_cases_age_ptb - sim_deaths)* frac_post * 
-                                 (qol - qol*(1-sim_post_qol[ii]))) 
-      
-      qaly_loss_post_itv<- colSums(as.data.frame((sim_cases_age_ptb_itv - 
-                                                    sim_deaths_itv) * frac_post * 
-                                                   (qol - qol*(1-sim_post_qol[ii])))
-      )
-      
-      qaly_loss_AE_itv <- npositives * tpt_cov  * tpt_ae * sim_ae_qol[ii]
-      
-      
-      qaly[ii,]<- sum(baseline_qaly) - qaly_loss_ptb - qaly_loss_eptb - 
-        qaly_loss_post - qaly_loss_deaths
-      
-      qaly_itv[ii,]<- sum(baseline_qaly) - qaly_loss_ptb_itv - qaly_loss_eptb_itv - 
-        qaly_loss_post_itv - qaly_loss_deaths_itv - qaly_loss_AE_itv 
-      
-      qaly_margin[ii,]<-qaly_itv[ii,]-qaly[ii,]
-      
-      # costs
-      
-      tbtx_cost<-discount_matrix * colSums(sim_cases_age ) *  tbtx_cost_yr
-      tbtx_cost_itv<- discount_matrix * colSums(sim_cases_age_itv) *  tbtx_cost_yr
-      
-      
-      itv_start_cost<- sim_test_cost[ii] * cohort_size + 
-        npositives * tpt_cov * tpt_compl * sim_tpt_cost[ii] + 
-        npositives * tpt_cov * (1-tpt_compl) * sim_tpt_cost[ii] * tpt_cost_lfup + 
-        sim_camp_cost[ii]
-      
-      
-      
-      cost[ii,]<- tbtx_cost
-      cost_itv[ii,]<- tbtx_cost_itv + itv_start_cost
-      cost_margin[ii,]<- cost_itv[ii,]- cost[ii,]
-      
-      
-    }
+    cost<- tbtx_cost
+    cost_itv<- tbtx_cost_itv + itv_start_cost
+    cost_margin<- cost_itv- cost
+    
+
+    
+    # 
+    # for (ii in 1:n_samples){
+    #   
+    #   qaly_loss_ptb <- discount_matrix * colSums(sim_cases_age_ptb * sim_tb_qol[ii] * av_tbdur)
+    #   
+    #   
+    #   qaly_loss_eptb <- discount_matrix *colSums(sim_cases_age_eptb * sim_eptb_qol[ii] * av_tbdur)
+    #   
+    #   
+    #   qaly_loss_ptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv * sim_tb_qol[ii] * av_tbdur))
+    #   
+    #   
+    #   qaly_loss_eptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv * 
+    #                                                                   sim_eptb_qol[ii] * av_tbdur))
+    #   
+    #   qaly_loss_post<- colSums((sim_cases_age_ptb - sim_deaths)* frac_post * (qol - qol*(1-sim_post_qol[ii]))) 
+    #   
+    #   qaly_loss_post_itv<- colSums(as.data.frame((sim_cases_age_ptb_itv - 
+    #                                                 sim_deaths_itv) * frac_post * 
+    #                                                (qol - qol*(1-sim_post_qol[ii]))))
+    #   
+    #   qaly_loss_AE_itv <- npositives * tpt_cov  * tpt_ae * sim_ae_qol[ii]
+    #   
+    #   
+    #   qaly[ii,]<- sum(baseline_qaly) - qaly_loss_ptb - qaly_loss_eptb - 
+    #     qaly_loss_post - qaly_loss_deaths
+    #   
+    #   qaly_itv[ii,]<- sum(baseline_qaly) - qaly_loss_ptb_itv - qaly_loss_eptb_itv - 
+    #     qaly_loss_post_itv - qaly_loss_deaths_itv - qaly_loss_AE_itv 
+    #   
+    #   qaly_margin[ii,]<-qaly_itv[ii,]-qaly[ii,]
+    #   
+    #   # costs
+    #   
+    #   tbtx_cost<-discount_matrix * colSums(sim_cases_age ) *  tbtx_cost_yr
+    #   tbtx_cost_itv<- discount_matrix * colSums(sim_cases_age_itv) *  tbtx_cost_yr
+    #   
+    #   
+    #   itv_start_cost<- sim_test_cost[ii] * cohort_size + 
+    #     npositives * tpt_cov * tpt_compl * sim_tpt_cost[ii] + 
+    #     npositives * tpt_cov * (1-tpt_compl) * sim_tpt_cost[ii] * tpt_cost_lfup + 
+    #     sim_camp_cost[ii]
+    #   
+    #   
+    #   
+    #   cost[ii,]<- tbtx_cost
+    #   cost_itv[ii,]<- tbtx_cost_itv + itv_start_cost
+    #   cost_margin[ii,]<- cost_itv[ii,]- cost[ii,]
+    #   
+    #   
+    # }
     
     
     
@@ -2684,6 +2741,23 @@ server <- function(input, output,session) {
     
     
     
+    #INB
+    lambda<-seq(0,50000,1000)
+    inb<-lambda%*%t(qaly_margin[,time_horizon]) - t(replicate(length(lambda),cost_margin[,time_horizon]))
+    
+    df_inb <- as.data.frame(
+      rowQuantiles(inb,
+                   probs = c(0.025, 0.5, 0.975)
+      )
+    )
+    df_inb$x<-lambda
+
+    
+    
+    # Incremental Net Benefit
+    
+    
+    
     # ICER  objects
     treats=c("No intervention", "Intervention")
     eff=cbind(qaly[,time_horizon],qaly_itv[,time_horizon])
@@ -2710,7 +2784,8 @@ server <- function(input, output,session) {
       marginal_cost=cost_margin,
       marginal_qaly=qaly_margin,
       QALYdist=QALYdist,
-      Costdist=Costdist
+      Costdist=Costdist,
+      INB=df_inb
     )
     
     return(out)
@@ -2853,6 +2928,33 @@ server <- function(input, output,session) {
         }
       )
     
+
+    # INB plot ----------------------------------------------------------------
+    
+    output$plot_INB <- renderPlot({
+      # req(input$will_to_pay)
+      df<-icer_object()$INB
+
+      
+      p <- ggplot(data = df, aes(x = x)) +
+        geom_ribbon(aes(ymin = `2.5%`, ymax = `97.5%`), fill ='darkorange', alpha = 0.2) +
+        geom_line(aes(y = `50%`), col = 'darkorange', lwd = 1) +
+        labs(
+          title = "Incremental Net Benefit Analysis"
+        )+
+        xlab("WTP (£/QALY)")+
+        ylab("Net Benefit (£)")+
+        theme_minimal()+
+        theme(
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+  
+      gridExtra::grid.arrange(p) 
+      
+      
+    })
+    
+
 
     # QALY break --------------------------------------------------------------
 
