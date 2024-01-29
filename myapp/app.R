@@ -25,7 +25,7 @@ library(matrixStats)
 
 
 # path_app<-rstudioapi::getSourceEditorContext()$path
-# setwd(gsub('/app.R','', path_app))
+#  setwd(gsub('/app.R','', path_app))
 
 
 # Load necessary input ----------------------------------------------------
@@ -75,18 +75,17 @@ age_bands<- as.data.table(read.xlsx("Inputs/inputs.xlsx", 5))
 
 ##### temp Values
 ## Epi
-cohort_size<-5000
-test<-"quantiferon" # tst or tspot
-year_test <- 2019
-country <- "Pakistan"
-time_horizon<-20
+# cohort_size<-5000
+# test<-"quantiferon" # tst or tspot
+# country <- "Pakistan"
+# time_horizon<-20
 
-
-
-
-## Costs
-tpt_cost <- 100  # once
-test_cost <- 50 # once
+# 
+# 
+# 
+# ## Costs
+# tpt_cost <- 100  # once
+# test_cost <- 50 # once
 tbtx_cost_yr <- 6000 ## per year
 
 
@@ -98,7 +97,7 @@ qol_full <- t(data.frame("A_16to35"=c(0.94),
 
 
 
-X <- Categorical(rownames(age_uk), p = age_uk/100)
+age.categorical <- Categorical(rownames(age_uk), p = age_uk/100)
 
 
 # UI  Menu---------------------------------------------------------------------
@@ -276,68 +275,109 @@ ui <- dashboardPage(
               tabsetPanel(type = "tabs", 
                           tabPanel("Demographics",
                                    
-                                   fluidRow(
-                                     box(
-                                       numericInput(inputId ="n", label="Cohort Size", value = 5000, min = 0, max = Inf),
+                                   
+                                   sidebarPanel(
+                                     
+                                     fluidRow(
+                                       column(width=3,
+                                              numericInput(inputId ="n", label="Cohort Size", 
+                                                           value = 5000, min = 0, max = Inf),
+                                       ),
+                                       column(width=4,
+                                              selectInput(
+                                                "cohort_mode", "Cohort type",
+                                                c( "Contacts"="contact","New entrants"="new"))
+                                       ),
+                                       conditionalPanel(
+                                         condition = "input.cohort_mode == 'contact'",
+                                         column(width=4,
+                                                selectInput(
+                                                  "contact_type", "Contact type",
+                                                  c( "Household"="household","Other"="other"))
+                                         )
+                                       )
                                      ),
-                                     box(
-                                       selectInput("country",label = "Choose country of origin",
-                                                   choices = c("Bangladesh","India","Lesotho" ,"Pakistan", "Uganda")),
-                                     )
+                                     
+                                     # Only show this panel if the plot type is a histogram
+                                     conditionalPanel(
+                                       condition = "input.cohort_mode == 'new'",
+                                       tags$h5("What fraction of the cohort comes from a 
+                                               'High TB burden' country?"),
+                                       tags$h6("(i.e., WHO TB incidence > 100 per 100k (Use the TB burden finder)"),
+                                       
+                                       
+                                       sliderInput("burden_100k", "%", 0, 100, 50, width='90%' ),
+                                       
+                                       fluidRow(
+                                         
+                                         column(width=4,
+                                                selectInput(
+                                                  "country", "Country",
+                                                  country_tb_inc$country_of_birth)),
+                                         
+                                         column(width=4,
+                                                br(),
+                                                verbatimTextOutput('country_burden')
+                                         )
+                                         
+                                       )
+                                       
+                                     ),
+                                     
+                                     
+                                     br(), 
+                                     
+                                     tags$h4("Age distribution (%)"),
+                                     sliderInput("age4", "65+", 0, 100, age_uk[4], width='90%' ),
+                                     sliderInput("age3", "46-65", 0, 100, age_uk[3], width='90%' ),
+                                     sliderInput("age2", "36-45 ", 0, 100, age_uk[2], width='90%' ),
+                                     sliderInput("age1", "16-35 ", 0, 100, age_uk[1], width='90%' ),
+                                     
+                                     verbatimTextOutput('result'),
+                                     tags$head(tags$style("#result{color: red}"))
+                                     
                                    ),
                                    
-                                   fluidRow(
+                                   mainPanel(
+                                     br(),
+                                     plotOutput("distPlot"),
                                      
-                                     box(
-                                       title = "Age distribution (%)",
-                                       sliderInput("age4", "65+", 0, 100, age_uk[4]),
-                                       sliderInput("age3", "46-65", 0, 100, age_uk[3]),
-                                       sliderInput("age2", "36-45 ", 0, 100, age_uk[2]),
-                                       sliderInput("age1", "16-35 ", 0, 100, age_uk[1]),
-                                       
-                                       verbatimTextOutput('result'),
-                                       tags$head(tags$style("#result{color: red}"
-                                       )
-                                       )
-                                     ),
-                                     
-                                     box(plotOutput("distPlot")),
-                                     
-                                   )),
+                                   )
+                          ),
                           
                           tabPanel("LTBI prevalence",
                                    
-                                   fluidRow(
+                                   sidebarPanel(
                                      
-                                     box(
-                                       title = "Expected TB infection prevalence (%)",
-                                       sliderInput("prev4", "65+", 0, 100, prev_uk[4]),
-                                       sliderInput("prev3", "46-65", 0, 100, prev_uk[3]),
-                                       sliderInput("prev2", "36-45 ", 0, 100, prev_uk[2]),
-                                       sliderInput("prev1", "16-35 ", 0, 100, prev_uk[1]),
-                                     ),
-                                     
-                                     box(plotOutput("prevPlot")),
+                                     tags$h4("Expected TB infection prevalence (%)"),
+                                     sliderInput("prev4", "65+", 0, 100, prev_uk[4], width='90%' ),
+                                     sliderInput("prev3", "46-65", 0, 100, prev_uk[3], width='90%' ),
+                                     sliderInput("prev2", "36-45 ", 0, 100, prev_uk[2], width='90%' ),
+                                     sliderInput("prev1", "16-35 ", 0, 100, prev_uk[1], width='90%' )
+                                   ),
+                                   
+                                   mainPanel( 
+                                     br(),
+                                     plotOutput("prevPlot"),
                                      
                                    )
                           ),
                           
                           tabPanel("HIV prevalence",
+                                   sidebarPanel(
+                                     
+                                     tags$h4( "Expected HIV prevalence (%)"),
+                                     sliderInput("hiv_prev4", "65+", 0, 100, 0, width='90%' ),
+                                     sliderInput("hiv_prev3", "46-65", 0, 100, 0, width='90%' ),
+                                     sliderInput("hiv_prev2", "36-45 ", 0, 100, 0, width='90%' ),
+                                     sliderInput("hiv_prev1", "16-35 ", 0, 100, 0, width='90%' )
+                                   ),
                                    
-                                   fluidRow(
-                                     box(
-                                       title = "Expected HIV prevalence (%)",
-                                       sliderInput("hiv_prev4", "65+", 0, 100, 0),
-                                       sliderInput("hiv_prev3", "46-65", 0, 100, 0),
-                                       sliderInput("hiv_prev2", "36-45 ", 0, 100, 0),
-                                       sliderInput("hiv_prev1", "16-35 ", 0, 100, 0),
-                                     ),
-                                     
-                                     
-                                     box(plotOutput("hiv_prevPlot")),
-                                     
-                                     
-                                   )),
+                                   mainPanel( 
+                                     br(),
+                                     plotOutput("hiv_prevPlot"),
+                                   )
+                          ),
                           
               )
       ),
@@ -345,60 +385,74 @@ ui <- dashboardPage(
       # UI single: LTBI casc ----------------------------------------------------
       tabItem(tabName = "cascade",
               
-              fluidRow(
-                valueBoxOutput(width=3,"tpt_effectiveness"),
-                
-                valueBoxOutput(width=3,"tpt_AE"),
-                
-              ),
               
-              fluidRow(
-                box(
-                  column(2,
-                         numericInput(inputId ="year_test", label="Year of test", value = 2020, min = 0, max = Inf),
-                  ),
-                  column(3,
+              sidebarPanel(
+                fluidRow(
+                  column(5,
                          selectInput("test",label = "Prefered test", choices = tests),
                   ),
-                  column(3,
+                  column(6,
                          selectInput("tpt", "Choose TPT regimen", c("6INH","3HP", "3RH")),
-                  ),
-                  column(3,
-                         checkboxGroupInput(inputId="age_tpt", 
-                                            label="TPT eligible age groups:",
-                                            choices=c(
-                                              "16-35" = "16-35",
-                                              "36-45" = "36-45",
-                                              "46-65" = "46-65",
-                                              "65+" = "65+"),
-                                            selected = c(
-                                              "36-45" = "36-45",
-                                              "46-65" = "46-65",
-                                              "65+" = "65+"))
-                         
                   )
                 ),
-                box(
-                  checkboxInput("manualae", "Manually input adverse events", FALSE),
-                  
-                  conditionalPanel(
-                    condition = "input.manualae == 1",
-                    numericInput("manualeamean", "% developing adverse events", value = 8, min = 0, max = 100),
+                
+                conditionalPanel(
+                  condition = "input.test == 'Tuberculin Skin Test'",
+                  tags$h5("TST attrition (i.e, lost to follow-up between injection and test reading)"),
+                  sliderInput("tst_attr", "%", 0, 100, 10),
+                ),
+                fluidRow(
+                  column(7,
+                         checkboxInput("manualAE", "Manually input AE (%)", FALSE),
                   ),
-                )
+                  conditionalPanel(
+                    condition = "input.manualAE == 1",
+                    column(3,
+                           numericInput("manualAEnum", label=NULL, value = 8, min = 0, max = 100),
+                    )
+                  )
+                ),
+                
+                br(),
+                checkboxGroupInput(inputId="age_tpt", 
+                                   label="TPT eligible age groups:",
+                                   choices=c(
+                                     "16-35" = "16-35",
+                                     "36-45" = "36-45",
+                                     "46-65" = "46-65",
+                                     "65+" = "65+"),
+                                   selected = c(
+                                     "36-45" = "36-45",
+                                     "46-65" = "46-65",
+                                     "65+" = "65+")),
+                
+                sliderInput("casc1", "LTBI positive that start TPT (%)", 0, 100, 100,width='90%'),
+                sliderInput("casc2", "TPT regimens completed (%) ", 0, 100, 90,width='90%')
               ),
               
-              fluidRow(
+              mainPanel(
                 
-                box(
-                  title = "LTBI testing and treatment cascade",
-                  plotOutput("cascadeplot")),
+                fluidRow(
+                  valueBoxOutput(width=5,"tpt_effectiveness"),
+                  
+                  valueBoxOutput(width=5,"tpt_AE"),
+                  
+                ),
                 
-                box(
-                  sliderInput("casc1", "LTBI positive that start TPT (%)", 0, 100, 100),
-                  sliderInput("casc2", "TPT regimens completed (%) ", 0, 100, 90)
-                )
-              ),
+                
+                tags$h4("LTBI testing and treatment cascade"),
+                conditionalPanel(
+                  condition = "input.test != 'Tuberculin Skin Test'",
+                  plotOutput("cascadeplot")
+                ),
+                conditionalPanel(
+                  condition = "input.test == 'Tuberculin Skin Test'",
+                  plotOutput("cascadeplot_tst")
+                ),
+                br(),
+                h5("Abbreviations: AE - Adverse events, TPT - TB Preventive Therapy"),
+              )
+              
               
       ),
       
@@ -516,6 +570,37 @@ ui <- dashboardPage(
                                        sliderInput("cost_ltfup", "Proportion of TPT regimen cost incurred by those lost to follow-up (%)" , 0, 100, 50),
                                      ),
                                    ),
+                          ),
+                          # cost TB Tx
+                          tabPanel("TB treatment",
+                                   
+                                   fluidRow(  
+                                     box(width = 4,
+                                         h3("Unit cost of complete TB treatment (£)"),
+                                         plotOutput("cost_tbtx", height = "35vh")
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("tbtxcost_dist", "", c("Gamma","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.tbtxcost_dist == 'PERT'",
+                                                  numericInput("cost_tbtx_pert", "Most likely", value = 6000, min = 0, max = Inf),
+                                                  numericInput("cost_tbtxmin_pert", "Min", value = 800, min = 0, max = Inf),
+                                                  numericInput("cost_tbtxmax_pert", "Max", value = 15000, min = 0, max = Inf),
+                                                  sliderInput("cost_tbtxlam", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.tbtxcost_dist == 'Gamma'",
+                                                  numericInput("cost_tbtx_gamma", "Mean", value = 6000, min = 0, max = Inf),
+                                                  numericInput("cost_tbtxsd_gamma", "SD", value = 1000, min = 0, max = Inf)
+                                                ),
+                                         )
+                                     )
+                                   )
+                                   
                           )
               )
               
@@ -737,7 +822,7 @@ ui <- dashboardPage(
                           
                           # ICER plane
                           tabPanel("ICER",
-   
+                                   
                                    fluidRow(
                                      valueBoxOutput("ICER"),
                                      valueBoxOutput("qalygained"),
@@ -748,9 +833,9 @@ ui <- dashboardPage(
                                      box(
                                        sliderInput("will_to_pay", "Wilingness to pay (£)", 5000, 50000, 20000)
                                      ),
-                                     actionButton("add","Run"),
+                                     actionButton("run","Run"),
                                      downloadButton("btn", "Generate Report"),
-                                     downloadButton("btncsv", "Download scenario parameters (.csv)")
+                                
                                    ),
                                    fluidRow(
                                      box(
@@ -767,7 +852,11 @@ ui <- dashboardPage(
                                    fluidPage(
                                      br(),
                                      br(),
-                                     plotOutput("plot_INB"),
+                                     fluidRow(
+                                       column(8, align="center",
+                                              plotOutput("plot_INB"),
+                                       )
+                                     ),
                                      br(),
                                      h5("Abbreviations: WTP (£/QALY) - Willingness to pay per QALY"),
                                      br(),
@@ -780,7 +869,11 @@ ui <- dashboardPage(
                                    fluidPage(
                                      br(),
                                      br(),
-                                     plotOutput("plot_QALYbreak"),
+                                     fluidRow(
+                                       column(8, align="center",
+                                              plotOutput("plot_QALYbreak"),
+                                       )
+                                     ),
                                      br(),
                                      h5("Abbreviations: AE - Adverse events, 
                                         EPTB - Extra-Pulmonary TB,
@@ -796,7 +889,11 @@ ui <- dashboardPage(
                                    fluidPage(
                                      br(),
                                      br(),
-                                     plotOutput("plot_Costbreak"),
+                                     fluidRow(
+                                       column(8, align="center",
+                                              plotOutput("plot_Costbreak"),
+                                       )
+                                     ),
                                      br(),
                                      h5("Abbreviations: LTBI test - latent TB infection test, 
                                          TPT - TB Prevention Therapy"),
@@ -805,7 +902,57 @@ ui <- dashboardPage(
                                      
                                      
                                    )
+                          ),
+                          # Cohort summary
+                          tabPanel("Cohort summary",
+                                   fluidRow(
+                                     column(
+                                       width=5,
+                                       
+                                       h3("Summary of events"),
+                                       br(),
+                                       tableOutput("cohort_tab"),
+                                       br(),
+                                       
+                                     ),
+                                     column(
+                                       width=6,
+                                       align="center",
+                                       br(),
+                                       plotOutput("cohort_plot"),
+                                       br(),
+                                     ),
+                                     
+                                   ),
+                                   h5("Abbreviations: LTBI test - latent TB infection test, 
+                                         TPT - TB Prevention Therapy, PTBLD - Post TB Lung Disease")
+                                   
+                                   
+                          ),
+                          # Table parameters
+                          tabPanel("Model parameters",
+                                   fluidRow(
+                                     column(
+                                       width=3,
+                                     tableOutput("table")
+                                     ),
+                                     column(
+                                       width = 4,
+                                     downloadButton("download", "Download scenario parameters (.csv)"),
+                                     )
+                                   ),
+                            
+                                   
+                                   
                           )
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
               )
               
               
@@ -846,7 +993,7 @@ ui <- dashboardPage(
                 p("TB infection testing cost-effectiveness calculator",style = "font-size:25px"),
                 p("This tool was created to help quantify and visualise the 
                   potential impact of performing TB infection tests, and providing
-                  TB preventive regimens among immigrant populations in the UK.",
+                  TB preventive regimens among new entrants in the UK or contacts of TB cases.",
                   style = "text-align: justify; font-size:18px"),
                 p("The user is prompted to input information on demographic characteristics
                   of the cohort, type of TB infection test, and the time
@@ -974,6 +1121,20 @@ server <- function(input, output,session) {
   observeEvent( input$n, {
     updateNumericInput(session, "n_selected", value = input$n)
   })
+  
+  
+  
+  output$country_burden<-renderText({
+    look <- left_join(
+      data.frame(country_of_birth=input$country,
+                 year_of_entry = 2018), 
+      country_tb_inc)
+    
+    out<-look$e_inc_100k
+    
+    paste(out, " per 100k")
+  })
+  
   
   
   output$Agedistr <- renderTable(age_uk, rownames=TRUE, colnames = FALSE)
@@ -1138,7 +1299,7 @@ server <- function(input, output,session) {
       
       valueBox(
         value = paste0((1-tpt_eff)*100,"%"),
-        subtitle = "TB disease reduction, i.e, 1-RR",
+        subtitle = paste0("TB disease reduction with ",input$tpt, ", i.e, 1-RR"),
         icon = icon("medkit"),
         color = "teal"
       )
@@ -1158,7 +1319,7 @@ server <- function(input, output,session) {
     
     valueBox(
       value = paste0((tpt_ae)*100,"%"),
-      subtitle = "% developing adverse events",
+      subtitle = paste0("% Developing AE with ",input$tpt, ", i.e, 1-RR"),
       icon = icon("medkit"),
       color = "orange"
     )
@@ -1200,6 +1361,62 @@ server <- function(input, output,session) {
     
     p<-ggplot(data=df, aes(x=label,y=val))+
       geom_bar(stat = "identity", fill=c("gold4","yellow4","yellow3","yellow2","yellow1","yellow"))+
+      ylab("Number")+ xlab("Cascade stage")+
+      theme_minimal()+
+      theme(
+        text = element_text(size=20),
+        axis.text.x = element_text(angle=60, hjust=1))
+    
+    
+    
+    gridExtra::grid.arrange(p)
+    
+    
+  })
+  
+  
+  
+  output$cascadeplot_tst <- renderPlot({
+    req(input$casc1,input$casc2)
+    cohort_size<-input$n
+    tst_attr<-input$tst_attr/100
+    start_tpt<-input$casc1/100
+    complete_tpt<-input$casc2/100
+    
+    tpt_eff<-0
+    if (input$tpt == "6INH"){
+      tpt_eff <- 0.6  
+    } else if(input$tpt =="3HP"){
+      tpt_eff <- 0.53 
+    } else if(input$tpt =="3RH"){
+      tpt_eff <- 0.6 
+    }
+    
+    
+    age<-dfage()
+    prev<-dfprev()
+    eligible<-data.frame(age=age$age, value=age$age%in%input$age_tpt)
+    ca1a<-cohort_size
+    ca1b<-cohort_size * (1-tst_attr)
+    ca2<-sum(((age$value)/100)*(prev$value/100)) * ca1b
+    ca3<-sum((age$value/100)*(prev$value/100) * eligible$value) * ca1b
+    ca4<-ca3*start_tpt
+    ca5<-ca4*complete_tpt
+    ca6<- ca5 * tpt_eff
+    
+    
+    df<-data.frame(label=c("TST performed","TST read", "LTBI+","Eligible for TPT","Starting TPT","Completing TPT","TBI cleared"),
+                   val = c(ca1a,
+                           ca1b,
+                           ca2,
+                           ca3,
+                           ca4,
+                           ca5,
+                           ca6))
+    df$label<- factor(df$label, levels = df$label)
+    
+    p<-ggplot(data=df, aes(x=label,y=val))+
+      geom_bar(stat = "identity", fill=c("gold3","gold4","yellow4","yellow3","yellow2","yellow1","yellow"))+
       ylab("Number")+ xlab("Cascade stage")+
       theme_minimal()+
       theme(
@@ -1346,7 +1563,34 @@ server <- function(input, output,session) {
   })
   
   
-  
+  output$cost_tbtx<- renderPlot({
+    
+    
+    n<-input$n
+    
+    if (input$tbtxcost_dist =="Gamma"){
+      xmean<-input$cost_tbtx_gamma
+      # xmin<-input$cost_tptmin_gamma
+      # xmax<-input$cost_tptmax_gamma
+      sd<- input$cost_tbtxsd_gamma#(xmax-xmin)/3.92 
+      shape<- (xmean^2)/(sd^2)
+      x  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$tbtxcost_dist =="PERT"){
+      
+      xmean<-input$cost_tbtx_pert
+      xmin<-input$cost_tbtxmin_pert
+      xmax<-input$cost_tbtxmax_pert
+      lam<- input$cost_tbtxlam
+      x<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    hist(x,
+         20,
+         main = " ",
+         xlab = "£",
+         col = "gold2")
+    
+  })
   
   
   
@@ -1513,12 +1757,18 @@ server <- function(input, output,session) {
   
   # Build Periskope dataset -------------------------------------------------
   
-  df<- reactive({
+  run_periskope<- reactive({
     
     cohort_size<-input$n
     test<-input$test # tst or tspot
-    year_test <- input$year_test
-    country <- input$country
+
+    
+    cohort_type<-input$cohort_mode
+    highburden<-input$burden_100k/100
+    contact_type<-input$contact_type
+    
+    
+    #country <- input$country
     time_horizon<-input$t_hor
     
     prev<-v2$data[,1]/100
@@ -1532,8 +1782,8 @@ server <- function(input, output,session) {
   46-65         56
   65+         83")
     
-    
-    samps_age<-random.Categorical(X, cohort_size)
+    # Sample from categorical distribution
+    samps_age<-random.Categorical(age.categorical, cohort_size)
     
     largetable <- data.frame(
       Age_cat = samps_age,
@@ -1602,14 +1852,46 @@ server <- function(input, output,session) {
     colnames(age_spline5) <- c("agespl2", "agespl3", "agespl4")
     base1 <- data.frame(base1,age_spline5)
     
+    
+    
+    
+    
     # Status
-    base1$exposure_cat4b <- "No contact, migrant"
-    base1$year_of_entry <- year_test-1
+    base1$contact<-if(cohort_type=="contact"){ "Yes" }else{ "No"}
+    base1$indexcase_proximity<-if(cohort_type=="contact")
+    { contact_type }else{ "Not applicable"}
+    base1$migrant<-if(cohort_type=="new"){ "Yes" }else{ "No"}
     
-    base1$country_of_birth<- country
     
-    base1 <- left_join(base1, country_tb_inc)
-    base1$exposure_cat4b[base1$e_inc_100k>=100 & base1$contact=="No"] <- "No contact, migrant"
+    
+    
+    # Exposure category 
+    
+    if(cohort_type=="contact"&& contact_type=="household"){
+      
+      base1$exposure_cat4b <- "Household, smear+"
+      
+    } else if(cohort_type=="contact"&& contact_type=="other"){
+      
+      base1$exposure_cat4b <-  "Other contacts"
+    }else{
+      
+      base1$exposure_cat4b <- "No contact, non-migrant"
+      
+      a1pos<-round(length(na1)*highburden)
+      base1$exposure_cat4b[na1[1:a1pos]]<-"No contact, migrant"
+      
+      a2pos<-round(length(na2)*highburden)
+      base1$exposure_cat4b[na2[1:a2pos]]<-"No contact, migrant"
+      
+      a3pos<-round(length(na3)*highburden)
+      base1$exposure_cat4b[na3[1:a3pos]]<-"No contact, migrant"
+      
+      a4pos<-round(length(na4)*highburden)
+      base1$exposure_cat4b[na4[1:a4pos]]<-"No contact, migrant"
+      
+    }
+    
     base1$months_migrant<-12
     base1$hivpos <- "No"
     base1$transplant<-"No"
@@ -1623,7 +1905,7 @@ server <- function(input, output,session) {
       rename(transplant_assumed=transplant)
     
     res<-list()
-    res$base1=base1
+    res$df=base1
     res$npositives=npositives
     return(res)
   })
@@ -1634,99 +1916,924 @@ server <- function(input, output,session) {
   # Create predictions object ------------------------------------------------
   
   
+  # 
+  # preds <- reactive({
+  #   
+  #   #req(input$t_hor)
+  #   cohort_size<-input$n
+  #   time_horizon<-input$t_hor
+  #   camp_cost<-input$cost_camp
+  #   test_cost<-input$cost_test
+  #   tpt_cost<-input$cost_tpt
+  #   tpt_cost_ltfup<-input$cost_ltfup/100
+  #   start_tpt<-input$casc1/100
+  #   complete_tpt<-input$casc2/100
+  #   tpt_eff<-0
+  #   if (input$tpt == "6INH"){
+  #     tpt_eff <- 0.6  
+  #   } else if(input$tpt =="3HP"){
+  #     tpt_eff <- 0.53 
+  #   } else if(input$tpt =="3RH"){
+  #     tpt_eff <- 0.6 
+  #   }
+  #   
+  #   #Define variables
+  #   base1<-run_periskope()$df
+  #   npositives<-length(which(base1$result=="Positive"))
+  #   
+  #   # Yearly predictions
+  #   predictions<-matrix(0,nrow = cohort_size, ncol = time_horizon)
+  #   predictions_low<-matrix(0,nrow = cohort_size, ncol = time_horizon)
+  #   predictions_high<-matrix(0,nrow = cohort_size, ncol = time_horizon)
+  #   
+  #   
+  #   
+  #   for (ii in 2:time_horizon){
+  #     base1$studytime <- (365*ii)-42
+  #     preds <- as.data.frame((predict(model, base1, type="fail", se.fit=T)))
+  #     predictions[,ii]<- preds[,1]
+  #     predictions_low[,ii]<- preds[,2]
+  #     predictions_high[,ii]<- preds[,3]
+  #   }
+  #   
+  #   predictions_cost = predictions*cohort_size* tbtx_cost_yr
+  #   predictions_cost_low= predictions_low*cohort_size* tbtx_cost_yr
+  #   predictions_cost_high= predictions_high*cohort_size* tbtx_cost_yr
+  #   
+  #   predictions_itv=predictions*tpt_eff*cohort_size
+  #   predictions_low_itv=predictions_low*tpt_eff*cohort_size
+  #   predictions_high_itv=predictions_high*tpt_eff*cohort_size
+  #   
+  #   start_cost= test_cost*cohort_size + 
+  #     npositives*start_tpt*complete_tpt*tpt_cost + 
+  #     npositives*start_tpt*(1-complete_tpt)*tpt_cost*tpt_cost_ltfup + camp_cost
+  #   
+  #   predictions_cost_itv=predictions*tpt_eff*cohort_size*tbtx_cost_yr + start_cost
+  #   predictions_cost_low_itv=predictions_low*tpt_eff*cohort_size*tbtx_cost_yr + start_cost
+  #   predictions_cost_high_itv=predictions_high*tpt_eff*cohort_size*tbtx_cost_yr + start_cost
+  #   
+  #   
+  #   out<-list(
+  #     # Useful objects 
+  #     database=base1,
+  #     npositives=npositives,
+  #     
+  #     # Epi predictions baseline
+  #     predictions = predictions,
+  #     predictions_low = predictions_low,
+  #     predictions_high = predictions_high,
+  #     
+  #     # Cost pedictions baseline
+  #     predictions_cost =predictions_cost,
+  #     predictions_cost_low= predictions_cost_low,
+  #     predictions_cost_high= predictions_cost_high,
+  #     
+  #     # Epi pedictions intervention
+  #     predictions_itv=predictions_itv,
+  #     predictions_low_itv=predictions_low_itv,
+  #     predictions_high_itv=predictions_high_itv,
+  #     
+  #     # Cost pedictions intervention
+  #     start_cost= start_cost,
+  #     predictions_cost_itv=predictions_cost_itv,
+  #     predictions_cost_low_itv=predictions_cost_low_itv,
+  #     predictions_cost_high_itv=predictions_cost_high_itv,
+  #     
+  #     # cases averted
+  #     casesaverted= predictions_itv-predictions*cohort_size,
+  #     casesaverted_low= predictions_low_itv-predictions_low*cohort_size,
+  #     casesaverted_high= predictions_high_itv-predictions_high*cohort_size,
+  #     
+  #     # Costs saved
+  #     costsaved=  predictions_cost_itv-predictions_cost,
+  #     costsaved_low= predictions_cost_low_itv - predictions_cost_low,
+  #     costsaved_high= predictions_cost_high_itv - predictions_cost_high)
+  #   
+  #   
+  #   return(out)
+  #   
+  # })
+  # 
+  # 
   
-  preds <- reactive({
-    
-    #req(input$t_hor)
-    cohort_size<-input$n
+ 
+  # QALY App components -----------------------------------------------------
+  
+  # Reactive dependencies - if these change then MODEL will run again and update values
+  xxchange <- reactive({
+    paste(input$disc_rate, input$t_hor)
+  })
+  
+  
+  QoLmodel <- eventReactive(xxchange(), {
+    country <- "UK"
+    smr <- 1#input$smr
+    qcm <- 1
+    r <- input$disc_rate/100
     time_horizon<-input$t_hor
-    camp_cost<-input$cost_camp
-    test_cost<-input$cost_test
-    tpt_cost<-input$cost_tpt
-    tpt_cost_ltfup<-input$cost_ltfup/100
-    start_tpt<-input$casc1/100
-    complete_tpt<-input$casc2/100
-    tpt_eff<-0
-    if (input$tpt == "6INH"){
-      tpt_eff <- 0.6  
-    } else if(input$tpt =="3HP"){
-      tpt_eff <- 0.53 
-    } else if(input$tpt =="3RH"){
-      tpt_eff <- 0.6 
+    
+    shiny::validate(
+      need(input$disc_rate <=10, "Please choose a valid discount rate between 0% and 10%"),
+      need(input$disc_rate >=0, "Please choose a valid discount rate between 0% and 10%"),
+    )
+    
+    myvector <- c("Age",country)
+    
+    l_x_est <- function(dt, countr, smr){
+      ## dt = data table with q(x) vaues
+      ## country = selected country
+      ## smr = smr
+      myvector <- c("Age",countr)
+      
+      y <- dt[, ..myvector]
+      colnames(y) <- c("x","q_x")
+      
+      y[ , d_x := -log(1-y$q_x)]
+      
+      y[ 1, l_x := 100000] 
+      
+      for (i in 2:nrow(y)){
+        y[i, l_x := y$l_x[[i-1]] * 
+            exp((-y$d_x[[i-1]])*smr)] 
+      }
+      return(y)
     }
     
+    q.male <- l_x_est(q.male, country, smr)
+    q.female <- l_x_est(q.female, country, smr)
+    
+    q.person <- merge(q.male, q.female, by="x")
+    colnames(q.person) <- c("x","q_male","d_male","l_male",
+                            "q_female","d_female","l_female")
+    q.person[ , p.f := l_female/(l_female+l_male)]
+    q.person[ , l_person := (p.f*l_female)+
+                ((1-p.f)*l_male)]
+    
+    for (i in 1:(nrow(q.person)-1)){
+      q.person[i, bigl_x := (q.person$l_person[[i]]+ q.person$l_person[[i+1]])/2]
+    }
+    
+    q.person[nrow(q.person), bigl_x := (q.person$l_person[[nrow(q.person)]])/2]
+    
+    for (i in 1:nrow(q.person)){
+      q.person[i, t_x := sum(q.person$bigl_x[i:nrow(q.person)])]
+    }
+    
+    q.person[ , LE_x := t_x/l_person]
+    
+    ########### calculating QALE ########
+    myvector.qol <- c("low","high",country)
+    
+    dt.qol <- qol[, ..myvector.qol]
+    colnames(dt.qol) <- c("low","high","qol_age")
+    
+    
+    qale <- q.person[dt.qol, on = .(x >= low, x <= high), nomatch = 0,
+                     .(x.x, l_person, bigl_x, t_x, LE_x,qol_age)]
+    
+    qale[ , z_x := bigl_x*qol_age*qcm]
+    
+    for (i in 1:nrow(qale)){
+      qale[i , t_adj := sum(qale$z_x[i:nrow(qale)])]
+    }
+    
+    qale[ , qale_x := t_adj/l_person]
+    
+    qaly.calc <- qale[ , c("x.x","z_x")]
+    
+    temp.q <- list()
+    for (i in 1:nrow(qaly.calc)){
+      temp.q[[i]] <- qaly.calc[i:nrow(qaly.calc),]
+    }
+    
+    temp.q <- bind_rows(temp.q, .id = "column_label")
+    temp.q %>% setDT() ## creating a copy as otherwise there is a warning
+    ## message (still runs but just for "clean" code), so this stops attempts of .internal.selfref detected
+    temp.q_copy <- copy(temp.q)
+    temp.q_copy[ , column_label := as.numeric(column_label)-1]
+    temp.q_copy[ , b_x := z_x/((1+r))^(x.x-(column_label))] ## n.b x.x = u and column_label = x in the corresponding formulae in the CodeBook
+    
+    
+    temp.q_copy<-temp.q_copy %>%
+      mutate(index=1*(x.x<=time_horizon))
+    
+    
+    total.b <- temp.q_copy[ , .(bigb_x = sum(b_x),
+                                bigb_xfoo = sum(b_x[index==1])), 
+                            by = column_label]
+    
+    
+    #total.b <- temp.q_copy[,.(bigb_x=sum(b_x)), by=column_label]
+    
+    colnames(total.b) <- c("x.x","bigb_x","bigb_xfoo")
+    qale <- merge(qale, total.b, by="x.x")
+    
+    qale[ , dQALY := bigb_xfoo/l_person]
+    
+    ######### calculating covid19 loss #######
+    
+    
+    age_bands[ , midpoint := ceiling((low+high)/2)]
+    
+    cov <- merge(qale, age_bands, by.x="x.x", by.y="midpoint", all=FALSE)
+    
+    ### ADDING AGE GROUP BREAKDOWN TABLE
+    cov[,"Age Group":=paste(cov[,low],cov[,high],sep="-")]
+    setnames(cov, old=c("LE_x","qale_x","dQALY"),
+             new=c("LE","QALE","dQALY"))
+    
+    agetab <- cov[ , c("Age Group",
+                       "LE","QALE","dQALY")]
+    
+    list( agetab=agetab)
+  })
+  
+  
+  output$agetab <- renderTable(QoLmodel()$agetab, bordered = TRUE)
+  
+  # ICER object -----------------------------------------------------
+  
+  
+  
+  
+  icer_object <- eventReactive(input$run,{
+    
+    # Inputs
+    set.seed(131)
+    n_samples <- 200
+    n<-n_samples 
+    cohort_size<-input$n
+    time_horizon<-input$t_hor
+    will_to_pay=input$will_to_pay
+    
+    tpt_cov<-input$casc1/100
+    tpt_compl<-input$casc2/100
+    tpt_cost_lfup<-input$cost_ltfup/100
+    dr<-input$disc_rate/100
+    
+    
+    #CFR Crofts et al2008
+    cfr <- c(0.012,0.012,0.048,0.176)
+    frac_eptb<-0.2
+    av_tbdur <- 1
+    frac_post<-0.25 # https://karger.com/res/article/100/8/751/820992/Post-Tuberculosis-Lung-Disease-Clinical-Review-of
+    qol_tab<- QoLmodel()$agetab
+    
+    tpt_eff<-0
+    tpt_ae<-0
+    if (input$tpt == "6INH"){
+      tpt_eff <- 0.6  
+      tpt_ae <- 0.04 
+    } else if(input$tpt =="3HP"){
+      tpt_eff <- 0.53 
+      tpt_ae <- 0.08
+    } else if(input$tpt =="3RH"){
+      tpt_eff <- 0.6 
+      tpt_ae <- 0.039
+    }
+   
+    tst_attr<-0
+    if (input$test == "Tuberculin Skin Test"){
+      
+      tst_attr<-input$tst_attr/100
+      
+    }
+    
+    
+    
+    
+    # Functions
+    estBetaParams <- function(mu, var) {
+      alpha <- ((1 - mu) / var - 1 / mu) * mu ^ 2
+      beta <- alpha * (1 / mu - 1)
+      return(params = list(alpha = alpha, beta = beta))
+    }
+    
+    
+    
+    # Campaign costs
+    cost_camp<- 0
+    cost_campsd<-  0 
+    cost_campmin<-  0
+    cost_campmax<-  0
+    cost_campshape<-  0
+    
+    if (input$campcost_dist =="Gamma"){
+      cost_camp<- input$cost_camp_gamma
+      cost_campsd<-  input$cost_campsd_gamma#(xmax-xmin)/3.92 
+      cost_campmin<-  NA
+      cost_campmax<-  NA
+      cost_campshape<-  NA
+      
+      xmean<-input$cost_camp_gamma
+      sd<- input$cost_campsd_gamma#(xmax-xmin)/3.92 
+      shape<- (xmean^2)/(sd^2)
+      sim_camp_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$campcost_dist =="PERT"){
+      
+      cost_campsd<-  NA 
+      cost_camp<-  input$cost_camp_pert
+      cost_campmin<-  input$cost_campmin_pert
+      cost_campmax<-  input$cost_campmax_pert
+      cost_campshape<-  input$cost_camplam
+      
+      xmean<-input$cost_camp_pert
+      xmin<-input$cost_campmin_pert
+      xmax<-input$cost_campmax_pert
+      lam<- input$cost_camplam
+      sim_camp_cost<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    
+    
+    ## test
+    cost_test<- 0
+    cost_testsd<-  0 
+    cost_testmin<-  0
+    cost_testmax<-  0
+    cost_testshape<-  0
+    if (input$testcost_dist =="Gamma"){
+      
+      cost_test<- input$cost_test_gamma
+      cost_testsd<-  input$cost_testsd_gamma
+      cost_testmin<-  NA
+      cost_testmax<-  NA
+      cost_testshape<-  NA
+      
+      xmean<-input$cost_test_gamma
+      sd<- input$cost_testsd_gamma# (xmax-xmin)/3.92 
+      shape<- (xmean^2)/(sd^2)
+      sim_test_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$testcost_dist =="PERT"){
+      
+      cost_test<-input$cost_test_pert
+      cost_testsd<-  NA 
+      cost_testmin<-  input$cost_testmin_pert
+      cost_testmax<-  input$cost_testmax_pert
+      cost_testshape<-  input$cost_testlam
+      
+      xmean<-input$cost_test_pert
+      xmin<-input$cost_testmin_pert
+      xmax<-input$cost_testmax_pert
+      lam<- input$cost_testlam
+      sim_test_cost<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    
+    
+    
+    ## TPT cost
+    cost_tpt<- 0
+    cost_tptsd<-  0 
+    cost_tptmin<-  0
+    cost_tptmax<-  0
+    cost_tptshape<-  0
+    if (input$tptcost_dist =="Gamma"){
+      cost_tpt<- input$cost_tpt_gamma
+      cost_tptsd<-  input$cost_tptsd_gamma 
+      cost_tptmin<-  NA
+      cost_tptmax<-  NA
+      cost_tptshape<-  NA
+      xmean<-input$cost_tpt_gamma
+      # xmin<-input$cost_tptmin_gamma
+      # xmax<-input$cost_tptmax_gamma
+      sd<- input$cost_tptsd_gamma#(xmax-xmin)/3.92 
+      shape<- (xmean^2)/(sd^2)
+      sim_tpt_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$tptcost_dist =="PERT"){
+      cost_tpt<- input$cost_tpt_pert
+      cost_tptsd<-  NA 
+      cost_tptmin<- input$cost_tptmin_pert 
+      cost_tptmax<-  input$cost_tptmax_pert
+      cost_tptshape<-  input$cost_tptlam
+      xmean<-input$cost_tpt_pert
+      xmin<-input$cost_tptmin_pert
+      xmax<-input$cost_tptmax_pert
+      lam<- input$cost_tptlam
+      sim_tpt_cost<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    
+    ## TB Tx cost
+    cost_tbtx<- 0
+    cost_tbtxsd<-  0 
+    cost_tbtxmin<-  0
+    cost_tbtxmax<-  0
+    cost_tbtxshape<-  0
+    if (input$tbtxcost_dist =="Gamma"){
+      cost_tbtx<- input$cost_tbtx_gamma
+      cost_tbtxsd<-  input$cost_tbtxsd_gamma 
+      cost_tbtxmin<-  NA
+      cost_tbtxmax<-  NA
+      cost_tbtxshape<-  NA
+      xmean<-input$cost_tbtx_gamma
+      # xmin<-input$cost_tbtxmin_gamma
+      # xmax<-input$cost_tbtxmax_gamma
+      sd<- input$cost_tbtxsd_gamma#(xmax-xmin)/3.92 
+      shape<- (xmean^2)/(sd^2)
+      sim_tbtx_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$tbtxcost_dist =="PERT"){
+      cost_tbtx<- input$cost_tbtx_pert
+      cost_tbtxsd<-  NA 
+      cost_tbtxmin<- input$cost_tbtxmin_pert 
+      cost_tbtxmax<-  input$cost_tbtxmax_pert
+      cost_tbtxshape<-  input$cost_tbtxlam
+      xmean<-input$cost_tbtx_pert
+      xmin<-input$cost_tbtxmin_pert
+      xmax<-input$cost_tbtxmax_pert
+      lam<- input$cost_tbtxlam
+      sim_tbtx_cost<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    
+    
+    
+    # TB QOL
+    qol_tb<- 0
+    qol_tbsd<-  0 
+    qol_tbmin<-  0
+    qol_tbmax<-  0
+    qol_tbshape<-  0
+    if (input$ptbqol_dist =="Beta"){
+      qol_tb<- input$qol_ptb_beta
+      qol_tbsd<-  input$qol_ptbsd_beta 
+      qol_tbmin<-  NA
+      qol_tbmax<-  NA
+      qol_tbshape<-  NA
+      xmean<-input$qol_ptb_beta
+      # xmin<-input$qol_ptbmin_beta
+      # xmax<-input$qol_ptbmax_beta
+      sd<- input$qol_ptbsd_beta# (xmax-xmin)/3.92 
+      pars_beta<-estBetaParams(xmean,sd^2 )
+      sim_tb_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
+      
+    } else if (input$ptbqol_dist =="PERT"){
+      qol_tb<- input$qol_ptb_pert
+      qol_tbsd<-  NA 
+      qol_tbmin<-  input$qol_ptbmin_pert
+      qol_tbmax<-  input$qol_ptbmax_pert
+      qol_tbshape<- input$qol_ptblam_pert
+      xmean<-input$qol_ptb_pert
+      xmin<-input$qol_ptbmin_pert
+      xmax<-input$qol_ptbmax_pert
+      lam<- input$qol_ptblam_pert
+      sim_tb_qol<-rpert(n,xmin,xmax,xmean,lam)
+      
+    }
+    
+    
+    #EPTB QoL
+    qol_eptb<- 0
+    qol_eptbsd<-  0 
+    qol_eptbmin<-  0
+    qol_eptbmax<-  0
+    qol_eptbshape<-  0
+    if (input$eptbqol_dist =="Beta"){
+      qol_eptb<- input$qol_eptb_beta
+      qol_eptbsd<- input$qol_eptbsd_beta
+      qol_eptbmin<-  NA
+      qol_eptbmax<-  NA
+      qol_eptbshape<- NA
+      xmean<-input$qol_eptb_beta
+      # xmin<-input$qol_eptbmin_beta
+      # xmax<-input$qol_eptbmax_beta
+      sd<- input$qol_eptbsd_beta#(xmax-xmin)/3.92 
+      pars_beta<-estBetaParams(xmean,sd^2 )
+      sim_eptb_qol  <- rbeta(n,pars_beta$alpha, pars_beta$beta)
+      
+    } else if (input$eptbqol_dist =="PERT"){
+      qol_eptb<- input$qol_eptb_pert
+      qol_eptbsd<-  NA 
+      qol_eptbmin<-  input$qol_eptbmin_pert
+      qol_eptbmax<-  input$qol_eptbmax_pert
+      qol_eptbshape<- input$qol_eptblam_pert
+      xmean<-input$qol_eptb_pert
+      xmin<-input$qol_eptbmin_pert
+      xmax<-input$qol_eptbmax_pert
+      lam<- input$qol_eptblam_pert
+      sim_eptb_qol <-rpert(n,xmin,xmax,xmean,lam)
+      
+    }
+    
+    # POstTB QoL
+    qol_postb<- 0
+    qol_postbsd<-  0 
+    qol_postbmin<-  0
+    qol_postbmax<-  0
+    qol_postbshape<-  0
+    if (input$postqol_dist =="Beta"){
+      qol_postb<- input$qol_post_beta
+      qol_postbsd<-  input$qol_postsd_beta 
+      qol_postbmin<-  NA
+      qol_postbmax<-  NA
+      qol_postbshape<-  NA
+      xmean<-input$qol_post_beta
+      # xmin<-input$qol_postmin_beta
+      # xmax<-input$qol_postmax_beta
+      sd<- input$qol_postsd_beta#(xmax-xmin)/3.92 
+      pars_beta<-estBetaParams(xmean,sd^2 )
+      sim_post_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
+      
+    } else if (input$postqol_dist =="PERT"){
+      qol_postb<- input$qol_post_pert
+      qol_postbsd<-  NA 
+      qol_postbmin<-  input$qol_postmin_pert
+      qol_postbmax<-  input$qol_postmax_pert
+      qol_postbshape<-  input$qol_postlam_pert
+      xmean<-input$qol_post_pert
+      xmin<-input$qol_postmin_pert
+      xmax<-input$qol_postmax_pert
+      lam<- input$qol_postlam_pert
+      sim_post_qol<-rpert(n,xmin,xmax,xmean,lam)
+      
+    }
+    
+    #AE TPT QOL
+    if (input$aeqol_dist =="Beta"){
+      
+      xmean<-input$qol_ae_beta
+      # xmin<-input$qol_aemin_beta
+      # xmax<-input$qol_aemax_beta
+      sd<- input$qol_aesd_beta#(xmax-xmin)/3.92 
+      pars_beta<-estBetaParams(xmean,sd^2 )
+      sim_ae_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
+      
+    } else if (input$aeqol_dist =="PERT"){
+      
+      xmean<-input$qol_ae_pert
+      xmin<-input$qol_aemin_pert
+      xmax<-input$qol_aemax_pert
+      lam<- input$qol_aelam_pert
+      sim_ae_qol<-rpert(n,xmin,xmax,xmean,lam)
+      
+    }
+    
+    
+    
+    
+    
+
+# Table of parameters -----------------------------------------------------
+
+    
+   
+    Table_params <- data.frame(
+      Parameter = c("Cohort size", 
+                    "Time horizon", 
+                    "Willingness to pay",
+                    "TPT",
+                    "TPT effectiveness",
+                    "TPT coverage",
+                    "TPT completion",
+                    "TPT cost in LFUP",
+                    "Cost of campaign",
+                    "Cost of campaign SD (Gamma)",
+                    "Cost of campaign min (PERT)",
+                    "Cost of campaign max (PERT)",
+                    "Cost of campaign shape (PERT)",
+                    "Cost of TBI test",
+                    "Cost of TBI test SD (Gamma)",
+                    "Cost of TBI test min (PERT)",
+                    "Cost of TBI test max (PERT)",
+                    "Cost of TBI test shape (PERT)",
+                    "Cost of TPT",
+                    "Cost of TPT SD (Gamma)",
+                    "Cost of TPT min (PERT)",
+                    "Cost of TPT max (PERT)",
+                    "Cost of TPT shape (PERT)",
+                    "Discount rate",
+                    "QoL of TB disease",
+                    "QoL of TB disease SD (Gamma)",
+                    "QoL of TB disease min (PERT)",
+                    "QoL of TB disease max (PERT)",
+                    "QoL of TB disease shape (PERT)",
+                    "QoL of EPTB disease",
+                    "QoL of EPTB disease SD (Gamma)",
+                    "QoL of EPTB disease min (PERT)",
+                    "QoL of EPTB disease max (PERT)",
+                    "QoL of EPTB disease shape (PERT)",
+                    "QoL of Post-TB disease",
+                    "QoL of Post-TB disease SD (Gamma)",
+                    "QoL of Post-TB disease min (PERT)",
+                    "QoL of Post-TB disease max (PERT)",
+                    "QoL of Post-TB disease shape (PERT)"
+                    
+      ),
+      Current_scenario =c( input$n, 
+                           input$t_hor, 
+                           input$will_to_pay,
+                           input$tpt,
+                           tpt_eff,
+                           tpt_cov,
+                           tpt_compl,
+                           tpt_cost_lfup,
+                           cost_camp,
+                           cost_campsd,
+                           cost_campmin,
+                           cost_campmax,
+                           cost_campshape,
+                           cost_test,
+                           cost_testsd, 
+                           cost_testmin,
+                           cost_testmax,
+                           cost_testshape,
+                           cost_tpt,
+                           cost_tptsd, 
+                           cost_tptmin,
+                           cost_tptmax,
+                           cost_tptshape,
+                           dr,
+                           qol_tb,
+                           qol_tbsd, 
+                           qol_tbmin,
+                           qol_tbmax,
+                           qol_tbshape,
+                           qol_eptb,
+                           qol_eptbsd, 
+                           qol_eptbmin,
+                           qol_eptbmax,
+                           qol_eptbshape,
+                           qol_postb,
+                           qol_postbsd, 
+                           qol_postbmin,
+                           qol_postbmax,
+                           qol_postbshape
+                           
+                           
+      )
+    )
+
+    cohort_size<-input$n
+    time_horizon<-input$t_hor
+    will_to_pay=input$will_to_pay
+    
+   
     #Define variables
-    base1<-df()$base1
-    npositives<-length(which(base1$result=="Positive"))
+    base1<-run_periskope()$df
+    npositives<- run_periskope()$npositives
     
     # Yearly predictions
     predictions<-matrix(0,nrow = cohort_size, ncol = time_horizon)
-    predictions_low<-matrix(0,nrow = cohort_size, ncol = time_horizon)
-    predictions_high<-matrix(0,nrow = cohort_size, ncol = time_horizon)
-    
-    
+    predictions_sd<-matrix(0,nrow = cohort_size, ncol = time_horizon)
     
     for (ii in 2:time_horizon){
       base1$studytime <- (365*ii)-42
       preds <- as.data.frame((predict(model, base1, type="fail", se.fit=T)))
-      predictions[,ii]<- preds[,1]
-      predictions_low[,ii]<- preds[,2]
-      predictions_high[,ii]<- preds[,3]
+      p_in<-preds[,1]
+      predictions[,ii]<-p_in 
+      predictions_sd[,ii]<- (preds[,3] - preds[,2])/3.92
+      
     }
     
-    predictions_cost = predictions*cohort_size* tbtx_cost_yr
-    predictions_cost_low= predictions_low*cohort_size* tbtx_cost_yr
-    predictions_cost_high= predictions_high*cohort_size* tbtx_cost_yr
     
-    predictions_itv=predictions*tpt_eff*cohort_size
-    predictions_low_itv=predictions_low*tpt_eff*cohort_size
-    predictions_high_itv=predictions_high*tpt_eff*cohort_size
-    
-    start_cost= test_cost*cohort_size + 
-      npositives*start_tpt*complete_tpt*tpt_cost + 
-      npositives*start_tpt*(1-complete_tpt)*tpt_cost*tpt_cost_ltfup + camp_cost
-    
-    predictions_cost_itv=predictions*tpt_eff*cohort_size*tbtx_cost_yr + start_cost
-    predictions_cost_low_itv=predictions_low*tpt_eff*cohort_size*tbtx_cost_yr + start_cost
-    predictions_cost_high_itv=predictions_high*tpt_eff*cohort_size*tbtx_cost_yr + start_cost
+    p<-matrix(runif(cohort_size*time_horizon), nrow=cohort_size)
+    logical_matrix <- p < predictions
     
     
-    out<-list(
-      # Useful objects 
-      database=base1,
-      npositives=npositives,
-      
-      # Epi predictions baseline
-      predictions = predictions,
-      predictions_low = predictions_low,
-      predictions_high = predictions_high,
-      
-      # Cost pedictions baseline
-      predictions_cost =predictions_cost,
-      predictions_cost_low= predictions_cost_low,
-      predictions_cost_high= predictions_cost_high,
-      
-      # Epi pedictions intervention
-      predictions_itv=predictions_itv,
-      predictions_low_itv=predictions_low_itv,
-      predictions_high_itv=predictions_high_itv,
-      
-      # Cost pedictions intervention
-      start_cost= start_cost,
-      predictions_cost_itv=predictions_cost_itv,
-      predictions_cost_low_itv=predictions_cost_low_itv,
-      predictions_cost_high_itv=predictions_cost_high_itv,
-      
-      # cases averted
-      casesaverted= predictions_itv-predictions*cohort_size,
-      casesaverted_low= predictions_low_itv-predictions_low*cohort_size,
-      casesaverted_high= predictions_high_itv-predictions_high*cohort_size,
-      
-      # Costs saved
-      costsaved=  predictions_cost_itv-predictions_cost,
-      costsaved_low= predictions_cost_low_itv - predictions_cost_low,
-      costsaved_high= predictions_cost_high_itv - predictions_cost_high)
     
+    
+    tmp<-data.frame(age=base1$agespl1,logical_matrix*1)
+    
+    
+    # Cumulative TB cases by age 
+    sim_cases_age<-tmp %>%
+      group_by(age) %>%
+      summarise(across(everything(), ~ sum(., na.rm = TRUE)))
+    
+    # Draw TB deaths from cases
+    exp_prob<-replicate(time_horizon,cfr) 
+    
+    binom_draw<- function(n,p){
+      round(n*p) #rbinom(n=1, size=n, prob=p)
+    }
+    
+    sim_cases_age<-sim_cases_age[,2:ncol(sim_cases_age)]
+    sim_cases_age_eptb<- round(sim_cases_age * frac_eptb)
+    sim_cases_age_ptb <- sim_cases_age-sim_cases_age_eptb
+    
+    c<-mapply(binom_draw,sim_cases_age_ptb,exp_prob)
+    sim_deaths <- matrix(c, nrow = nrow(sim_cases_age_ptb), ncol = ncol(logical_matrix))
+    
+    
+    # Cases and deaths under interventions
+    exp_prob_itv<-matrix(tpt_eff,nrow = nrow(sim_cases_age), ncol = ncol(logical_matrix) )
+    c<-mapply(binom_draw,sim_cases_age,exp_prob_itv)
+    sim_cases_age_itv <- matrix(c, nrow = nrow(sim_cases_age), ncol = ncol(logical_matrix))
+    sim_cases_age_eptb_itv<- round(sim_cases_age_itv * frac_eptb)
+    sim_cases_age_ptb_itv <- sim_cases_age_itv-sim_cases_age_eptb_itv
+    
+    c<-mapply(binom_draw,sim_cases_age_ptb_itv,exp_prob)
+    sim_deaths_itv <- matrix(c, nrow = nrow(sim_cases_age_ptb_itv), ncol = ncol(logical_matrix))
+    
+    qol<- QoLmodel()$agetab$dQALY
+    
+    baseline_qaly<- table(base1$agespl1) * qol
+    qaly_loss_deaths<- colSums(sim_deaths * qol)
+    qaly_loss_deaths_itv<- colSums(sim_deaths_itv * qol)
+    
+    
+    qaly<-matrix(0,nrow = n_samples, ncol=time_horizon)
+    qaly_itv<-matrix(0,nrow = n_samples, ncol=time_horizon)
+    qaly_margin<-matrix(0,nrow = n_samples, ncol=time_horizon)
+    
+    cost<-matrix(0,nrow = n_samples, ncol=time_horizon)
+    cost_itv<-matrix(0,nrow = n_samples, ncol=time_horizon)
+    cost_margin<-matrix(0,nrow = n_samples, ncol=time_horizon)
+    
+    
+    tmp<-matrix(1,nrow = 1, ncol=time_horizon)
+    
+    discount_matrix<-((tmp)/((1 + dr)^ seq_len(ncol(tmp)) ))
+    qol_exp<-matrix(rep(qol,n_samples), nrow = nrow(sim_cases_age_ptb_itv), ncol = time_horizon )
+    
+    
+    
+    qaly_loss_ptb <- t(t(discount_matrix * colSums(sim_cases_age_ptb))  %*%   (sim_tb_qol * av_tbdur))
+    qaly_loss_eptb<- t(t(discount_matrix * colSums(sim_cases_age_eptb))  %*%   (sim_eptb_qol * av_tbdur))
+    qaly_loss_ptb_itv <- t(t(discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv)))  %*%   (sim_tb_qol * av_tbdur))
+    qaly_loss_eptb_itv<- t(t(discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv)))  %*%   (sim_eptb_qol * av_tbdur))
+    qaly_loss_post <-t(colSums((sim_cases_age_ptb - sim_deaths)* frac_post * qol)  %*% t(sim_post_qol)) 
+    qaly_loss_post_itv <-t(colSums(as.data.frame((sim_cases_age_ptb_itv - sim_deaths_itv)* frac_post * qol))  %*% t(sim_post_qol)) 
+    qaly_loss_AE_itv<- npositives * tpt_cov  * tpt_ae * sim_ae_qol
+    
+    deaths_loss<-t(replicate(n_samples,qaly_loss_deaths)) 
+    deaths_loss_itv<-t(replicate(n_samples,qaly_loss_deaths_itv)) 
+    
+    qaly<-     sum(baseline_qaly)- (qaly_loss_ptb + qaly_loss_eptb + qaly_loss_post + deaths_loss) 
+    qaly_itv<- sum(baseline_qaly)- (qaly_loss_ptb_itv + qaly_loss_eptb_itv + 
+                                      qaly_loss_post_itv + deaths_loss_itv+qaly_loss_AE_itv) 
+    
+    qaly_margin<-qaly_itv-qaly
+    
+    #Costs
+    
+    
+    tbtx_cost<- t(replicate(n_samples, drop(discount_matrix) * drop(colSums(sim_cases_age)))*  t(replicate(time_horizon, sim_tbtx_cost))) 
+    tbtx_cost_itv<- t(replicate(n_samples, drop(discount_matrix) * drop(colSums(sim_cases_age_itv)))*  t(replicate(time_horizon, sim_tbtx_cost))) 
+    
+    
+    itv_start_cost<-replicate(time_horizon, sim_test_cost * cohort_size *(1-tst_attr) + 
+                                npositives * tpt_cov * tpt_compl * sim_tpt_cost + 
+                                npositives * tpt_cov * (1-tpt_compl) * sim_tpt_cost * tpt_cost_lfup + sim_camp_cost)
+    
+    
+    
+    cost<- tbtx_cost
+    cost_itv<- tbtx_cost_itv + itv_start_cost
+    cost_margin<- cost_itv- cost
+    
+    
+    
+    
+    
+    # QALY loss composition
+    
+    qaly_loss_ptb <- discount_matrix * colSums( sim_cases_age_ptb * 
+                                                  mean(sim_tb_qol) * av_tbdur)
+    qaly_loss_eptb <- discount_matrix * colSums( sim_cases_age_eptb * 
+                                                   mean(sim_eptb_qol) * av_tbdur)
+    
+    
+    qaly_loss_ptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv * 
+                                                                   mean(sim_tb_qol) * av_tbdur))
+    
+    
+    qaly_loss_eptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv * 
+                                                                    mean(sim_eptb_qol) * av_tbdur))
+    
+    qaly_loss_post<- colSums((sim_cases_age_ptb - sim_deaths)* frac_post *(qol - qol*(1-mean(sim_post_qol)))) 
+    
+    qaly_loss_post_itv<- colSums(as.data.frame((sim_cases_age_ptb_itv - 
+                                                  sim_deaths_itv)  * frac_post *(qol - qol*(1-mean(sim_post_qol))))) 
+    
+    
+    qaly_loss_AE_itv <- npositives * tpt_cov  * tpt_ae * mean(sim_ae_qol)
+    
+    qaly_loss_AE <- 0
+    
+    qaly_loss_dist<-rbind(Death=qaly_loss_deaths,
+                          PTB=qaly_loss_ptb,
+                          EPTB=qaly_loss_eptb,
+                          POstTB=qaly_loss_post,
+                          AE=qaly_loss_AE)
+    
+    
+    qaly_loss_dist_itv<-rbind(Death=qaly_loss_deaths_itv,
+                              PTB=qaly_loss_ptb_itv,
+                              EPTB=qaly_loss_eptb_itv,
+                              PostTB=qaly_loss_post_itv,
+                              AE=qaly_loss_AE_itv)
+    
+    
+    
+    # Cost composition
+    
+    tbtx_cost<-as.numeric(discount_matrix * colSums(sim_cases_age ) *  tbtx_cost_yr)
+    tbtx_cost_itv<- as.numeric(discount_matrix * colSums(sim_cases_age_itv) *  tbtx_cost_yr)
+    
+    
+    test_cost_itv<- mean(sim_test_cost) * cohort_size  *(1-tst_attr)
+    tpt_cost_itv<-  npositives * tpt_cov * tpt_compl * mean(sim_tpt_cost) + 
+      npositives * tpt_cov * (1-tpt_compl) * mean(sim_tpt_cost) * tpt_cost_lfup  
+    camp_cost_itv<-  mean(sim_camp_cost)
+    
+    test_cost<- 0 
+    tpt_cost<- 0  
+    camp_cost<- 0
+    
+    cost_dist<- rbind(TBtx =tbtx_cost,
+                      LTBITests=test_cost,
+                      TPT = tpt_cost,
+                      Campaign=camp_cost)
+    
+    cost_dist_itv<- rbind(TBtx=tbtx_cost_itv,
+                          LTBITests=test_cost_itv,
+                          TPT = tpt_cost_itv,
+                          Campaign=camp_cost_itv)
+    
+    
+    
+    
+    # Incremental Net Benefit
+    lambda<-seq(0,50000,1000)
+    inb<-lambda%*%t(qaly_margin[,time_horizon]) - t(replicate(length(lambda),cost_margin[,time_horizon]))
+    
+    df_inb <- as.data.frame(
+      rowQuantiles(inb,
+                   probs = c(0.025, 0.5, 0.975)
+      )
+    )
+    df_inb$x<-lambda
+    
+    
+    # Breakdown tables
+    
+    
+    
+    coh_tab<-data.frame(
+      Baseline    =c(cohort_size,
+                     npositives,
+                     0,
+                     0,
+                     0,
+                     colSums(sim_cases_age)[time_horizon],
+                     round(colSums(sim_cases_age_ptb - sim_deaths)[time_horizon]* frac_post),
+                     colSums(sim_deaths)[time_horizon]
+      ),
+      Intervention=c(cohort_size,
+                     npositives,
+                     cohort_size,
+                     npositives * tpt_cov,
+                     npositives * tpt_cov * tpt_compl,
+                     colSums(sim_cases_age_itv)[time_horizon],
+                     round(colSums(sim_cases_age_ptb_itv - sim_deaths_itv)[time_horizon]* frac_post),
+                     colSums(sim_deaths_itv)[time_horizon]
+      )
+      
+    )
+    
+    rownames(coh_tab)<-paste<-c("Total population",
+                                "LTBI+",
+                                "LTBI tested",
+                                "Received TPT",
+                                "Completed TPT",
+                                "Active TB cases",
+                                "PTBLD",
+                                "TB Deaths")
+    
+    
+    
+    
+    # ICER  objects
+    treats=c("No intervention", "Intervention")
+    eff=cbind(qaly[,time_horizon],qaly_itv[,time_horizon])
+    cost=cbind(cost[,time_horizon],cost_itv[,time_horizon])
+    
+    QALYdist=cbind(qaly_loss_dist[,time_horizon],qaly_loss_dist_itv[,time_horizon])
+    colnames(QALYdist)<-paste(treats)
+    
+    Costdist=cbind(cost_dist[,time_horizon],cost_dist_itv[,time_horizon])
+    colnames(Costdist)<-paste(treats)
+    
+    
+    
+    out <-list(
+      cohort_size=input$n,
+      time_horizon=input$t_hor,
+      will_to_pay=input$will_to_pay,
+      treats=treats,
+      eff=eff,
+      cost=cost,
+      bcea_tb=bcea(eff,cost, ref=2,interventions=treats),
+      ICER =cost_margin/qaly_margin,
+      marginal_cost=cost_margin,
+      marginal_qaly=qaly_margin,
+      QALYdist=QALYdist,
+      Costdist=Costdist,
+      INB=df_inb,
+      cohort_table=coh_tab,
+      tab_pars=Table_params
+    )
     
     return(out)
     
@@ -1734,6 +2841,358 @@ server <- function(input, output,session) {
   
   
   
+  # ICER plane --------------------------------------------------------------
+  
+  
+  observeEvent(input$run, {
+    
+    
+    output$ICER <- renderValueBox({
+      #req(input$will_to_pay)
+      will_to_pay=input$will_to_pay
+      obj<-icer_object()
+      bceares<- obj$bcea_tb
+      icer<-bceares$ICER
+      valueBox(
+        value = tags$p(scales::dollar(icer, prefix = ''),#formatC(icer, digits = 0, format = "f"),
+                       style = "color:white;font-size:28px;"), 
+        subtitle = "ICER (£/QALY)",
+        icon = icon("bullseye"),
+        color = if (icer <= will_to_pay) "yellow" else "red"
+      )
+    })
+    
+    
+    
+    output$costsaved <- renderValueBox({
+      obj<-icer_object()
+      bceares<- obj$bcea_tb
+      x<-mean(unlist(obj$bcea_tb$delta_c),na.rm=TRUE)
+      valueBox(
+        value =  tags$p(scales::dollar(x, prefix = '£'),
+                        style = "color:white;font-size:28px;"), 
+        subtitle = "Mean Incremental cost (£)",
+        icon = icon("sterling-sign"),
+        color =  "aqua"
+      )
+    })
+    
+    
+    output$qalygained <- renderValueBox({
+      obj<-icer_object()
+      bceares<- obj$bcea_tb
+      x<-mean(unlist(obj$bcea_tb$delta_e),na.rm=TRUE)
+      valueBox(
+        value = tags$p(formatC(x, digits = 0, format = "f"),
+                       style = "color:white;font-size:28px;"), 
+        subtitle = "Mean Incremental QALY",
+        icon = icon("person"),
+        color =  "aqua"
+      )
+    })
+    
+    
+    output$plot_icer <- renderPlot({
+      #req(input$will_to_pay)
+      obj<-icer_object()
+      bceares<- obj$bcea_tb
+      will_to_pay=input$will_to_pay
+      icercol<-"#FF3333"
+      plot(bceares, 
+           wtp =will_to_pay,
+           graph="ggplot2",
+           line = list(color = "grey40"),
+           point = list(color = "blue"),
+           icer = list(color = icercol, size = 3),
+           area = list(fill = "lightcyan"),
+           theme = theme_minimal())
+      
+    })
+    
+    output$plot_contour <- renderPlot({
+      #req(input$will_to_pay)
+      obj<-icer_object()
+      bceares<- obj$bcea_tb
+      will_to_pay=input$will_to_pay
+      
+      contour2(bceares, 
+               wtp =will_to_pay,
+               graph = "ggplot2",
+               xlabel = "Incremental QALY" )
+    })
+    
+    output$plot_wtp <- renderPlot({
+      # req(input$will_to_pay)
+      obj<-icer_object()
+      bceares<- obj$bcea_tb
+      icers<- bceares$delta_c/bceares$delta_e
+      val1<-length(which(icers<20000))/dim(icers)[1] 
+      val2<-length(which(icers<30000))/dim(icers)[1]
+      
+      
+      
+      
+      df<-data.frame(
+        pos = c(1 ,3),
+        val = c(val1*1e2,val2*1e2),
+        cat = c("£20k","£30k")
+      )
+      
+      p<-ggplot(df, aes(x=cat, y=val))+
+        geom_bar(stat="identity", fill=c('firebrick',"darkgreen"),  alpha=0.35)+
+        ylim(c(0,100))+
+        geom_segment(aes(x = 0.75, y = 50, xend = 1.25, yend = 50), size=1,linetype='dotted', col = 'firebrick')+
+        geom_segment(aes(x = 1.75, y = 90, xend = 2.25, yend = 90),size=1,linetype='dotted', col = 'darkgreen')+
+        labs(
+          title = "Cost-effectiveness thresholds at £20k and £30k per QALY"
+        )+
+        xlab(" ")+
+        ylab("Simulations under specific WTP (%)")+
+        theme_minimal()+
+        theme(
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      
+      gridExtra::grid.arrange(p)  
+      
+    })
+    
+    
+    
+    
+    # Download single parameters ----------------------------------------------
+    output$table <- renderTable(icer_object()$tab_pars)
+    
+   
+    
+    output$download <-
+      downloadHandler(
+        filename = function () {
+          paste("MyData.csv", sep = "")
+        },
+        
+        content = function(file) {
+          write.csv(icer_object()$tab_pars, file)
+        }
+      )
+    
+    
+    # INB plot ----------------------------------------------------------------
+    
+    output$plot_INB <- renderPlot({
+      # req(input$will_to_pay)
+      df<-icer_object()$INB
+      t<-input$t_hor
+      icer<-mean(icer_object()$ICER[,t])
+      
+      
+      
+      p <- ggplot(data = df, aes(x = x)) +
+        geom_ribbon(aes(ymin = `2.5%`, ymax = `97.5%`), fill ='darkorange', alpha = 0.2) +
+        geom_line(aes(y = `50%`), col = 'darkorange', lwd = 1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 25, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 20, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 15, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 10, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 5, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        annotate(geom="text", x=icer, y=1000, label="ICER",
+                 color="grey40")+
+        labs(
+          title = "Incremental Net Benefit Analysis"
+        )+
+        xlab("WTP (£/QALY)")+
+        ylab("Net Benefit (£)")+
+        theme_minimal()+
+        theme(
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      gridExtra::grid.arrange(p) 
+      
+      
+    })
+    
+    
+    
+    # QALY break --------------------------------------------------------------
+    
+    output$plot_QALYbreak <- renderPlot({
+      # req(input$will_to_pay)
+      obj<-icer_object()
+      df<-data.frame(obj$QALYdist)
+      df$Category<-c("Death","PTB","EPTB","PTBLD", "AE")
+      
+      
+      dfm<-reshape2::melt(df)
+      
+      p<-ggplot(dfm,aes(x=variable, y=value, fill=Category))+
+        geom_bar(stat = "identity")+
+        labs(
+          title = "Breakdown of QALYs lost"
+        )+
+        xlab(" ")+
+        ylab("QALYs Lost")+
+        scale_fill_manual(values = c( 'navy','gold', 'darkorange','green4','grey38')) +
+        theme_minimal()+
+        theme(
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      gridExtra::grid.arrange(p) 
+      
+      
+    })
+    
+    
+    
+    
+    
+    # Cost breakdown ----------------------------------------------------------
+    
+    
+    output$plot_Costbreak <- renderPlot({
+      
+      obj<-icer_object()
+      df<-data.frame(obj$Costdist)
+      df$Category<-c("TB treatment","LTBI test","TPT","Campaign")
+      
+      dfm<-reshape2::melt(df)
+      dfm1<-dfm[dfm$Category=="TB treatment",]
+      dfm2<-dfm[dfm$Category != "TB treatment",]
+      dfm2<-dfm2[dfm2$variable=="Intervention",]
+      
+      p1<-ggplot(dfm1,aes(x=variable, y=value))+
+        geom_bar(stat = "identity", fill='green4')+
+        labs(
+          title = "Costs of treating TB cases"
+        )+
+        xlab(" ")+
+        ylab("Cost (£)")+
+        theme_minimal()+
+        theme(
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      
+      p2<-ggplot(dfm2,aes(x=variable, y=value, fill=Category))+
+        geom_bar(stat = "identity")+
+        labs(
+          title = "Breakdown of Intervention Costs"
+        )+
+        xlab(" ")+
+        ylab("Cost (£)")+
+        scale_fill_manual(values = c('deeppink3','grey38','gold')) +
+        theme_minimal()+
+        theme(
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      gridExtra::grid.arrange(p1,p2, nrow=1) 
+      
+      
+    })
+    
+    # Cohort table ------------------------------------------------------------
+    
+    output$cohort_tab <- renderTable({
+      icer_object()$cohort_table}, digits = 0, bordered = TRUE,rownames = TRUE)
+    
+    
+    
+    
+    output$cohort_plot<- renderPlot({
+      
+      df<- icer_object()$cohort_table
+      df$x<-rownames(df)
+      df$x<-factor(df$x, levels = rownames(df))
+      dfm<-reshape2::melt(df)
+      p<-ggplot(dfm,aes(x=x,y=value,fill=variable))+
+        geom_bar(stat="identity", position='dodge')+
+        labs(
+          title = "Simulated cohort events"
+        )+
+        ylab("N")+
+        xlab("")+
+        scale_fill_manual(values = c('grey38','gold')) +
+        theme_minimal()+
+        theme(
+          legend.title =element_blank(),
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      gridExtra::grid.arrange(p) 
+      
+      
+    })
+    
+  })
+    
+    
+    # Produce markdown report -------------------------------------------------
+    
+    
+    output$btn <- downloadHandler(
+      
+      filename = function(){"myreport.pdf"},
+      content = function(file) {
+        
+        tempReport <- file.path(tempdir(),"markdown_template.Rmd")
+        file.copy("markdown_template.Rmd", tempReport, overwrite = TRUE)
+        rmarkdown::render("markdown_template.Rmd", output_format = "pdf_document", output_file = file,
+                          params = list(data = icer_object()), # here I'm passing data in params
+                          envir = new.env(parent = globalenv()),clean=F,encoding="utf-8"
+        )
+        
+        
+      }
+    )
+    
+    
+    
+    
+    ########### Scenarios 
+    
+    # Scenarios ---------------------------------------------------------------
+    
+    
+    # Table_params
+    output$table_params <- renderTable({
+      icer_object()$table
+    })
+    
+    
+ 
+  
+  
+
+# EXtra plots -------------------------------------------------------------
+
   # Epi plots ----------------------------------------------------------
   
   
@@ -1956,1113 +3415,6 @@ server <- function(input, output,session) {
       )
     
     gridExtra::grid.arrange(cost, cost_itv,cost_saved)
-    
-    
-  })
-  
-  # QALY App components -----------------------------------------------------
-  
-  # Reactive dependencies - if these change then MODEL will run again and update values
-  xxchange <- reactive({
-    paste(input$disc_rate, input$t_hor)
-  })
-  
-  
-  QoLmodel <- eventReactive(xxchange(), {
-    country <- "UK"
-    smr <- 1#input$smr
-    qcm <- 1
-    r <- input$disc_rate/100
-    time_horizon<-input$t_hor
-    
-    shiny::validate(
-      need(input$disc_rate <=10, "Please choose a valid discount rate between 0% and 10%"),
-      need(input$disc_rate >=0, "Please choose a valid discount rate between 0% and 10%"),
-    )
-    
-    myvector <- c("Age",country)
-    
-    l_x_est <- function(dt, countr, smr){
-      ## dt = data table with q(x) vaues
-      ## country = selected country
-      ## smr = smr
-      myvector <- c("Age",countr)
-      
-      y <- dt[, ..myvector]
-      colnames(y) <- c("x","q_x")
-      
-      y[ , d_x := -log(1-y$q_x)]
-      
-      y[ 1, l_x := 100000] 
-      
-      for (i in 2:nrow(y)){
-        y[i, l_x := y$l_x[[i-1]] * 
-            exp((-y$d_x[[i-1]])*smr)] 
-      }
-      return(y)
-    }
-    
-    q.male <- l_x_est(q.male, country, smr)
-    q.female <- l_x_est(q.female, country, smr)
-    
-    q.person <- merge(q.male, q.female, by="x")
-    colnames(q.person) <- c("x","q_male","d_male","l_male",
-                            "q_female","d_female","l_female")
-    q.person[ , p.f := l_female/(l_female+l_male)]
-    q.person[ , l_person := (p.f*l_female)+
-                ((1-p.f)*l_male)]
-    
-    for (i in 1:(nrow(q.person)-1)){
-      q.person[i, bigl_x := (q.person$l_person[[i]]+ q.person$l_person[[i+1]])/2]
-    }
-    
-    q.person[nrow(q.person), bigl_x := (q.person$l_person[[nrow(q.person)]])/2]
-    
-    for (i in 1:nrow(q.person)){
-      q.person[i, t_x := sum(q.person$bigl_x[i:nrow(q.person)])]
-    }
-    
-    q.person[ , LE_x := t_x/l_person]
-    
-    ########### calculating QALE ########
-    myvector.qol <- c("low","high",country)
-    
-    dt.qol <- qol[, ..myvector.qol]
-    colnames(dt.qol) <- c("low","high","qol_age")
-    
-    
-    qale <- q.person[dt.qol, on = .(x >= low, x <= high), nomatch = 0,
-                     .(x.x, l_person, bigl_x, t_x, LE_x,qol_age)]
-    
-    qale[ , z_x := bigl_x*qol_age*qcm]
-    
-    for (i in 1:nrow(qale)){
-      qale[i , t_adj := sum(qale$z_x[i:nrow(qale)])]
-    }
-    
-    qale[ , qale_x := t_adj/l_person]
-    
-    qaly.calc <- qale[ , c("x.x","z_x")]
-    
-    temp.q <- list()
-    for (i in 1:nrow(qaly.calc)){
-      temp.q[[i]] <- qaly.calc[i:nrow(qaly.calc),]
-    }
-    
-    temp.q <- bind_rows(temp.q, .id = "column_label")
-    temp.q %>% setDT() ## creating a copy as otherwise there is a warning
-    ## message (still runs but just for "clean" code), so this stops attempts of .internal.selfref detected
-    temp.q_copy <- copy(temp.q)
-    temp.q_copy[ , column_label := as.numeric(column_label)-1]
-    temp.q_copy[ , b_x := z_x/((1+r))^(x.x-(column_label))] ## n.b x.x = u and column_label = x in the corresponding formulae in the CodeBook
-    
-    
-    temp.q_copy<-temp.q_copy %>%
-      mutate(index=1*(x.x<=time_horizon))
-    
-    
-    total.b <- temp.q_copy[ , .(bigb_x = sum(b_x),
-                                bigb_xfoo = sum(b_x[index==1])), 
-                            by = column_label]
-    
-    
-    #total.b <- temp.q_copy[,.(bigb_x=sum(b_x)), by=column_label]
-    
-    colnames(total.b) <- c("x.x","bigb_x","bigb_xfoo")
-    qale <- merge(qale, total.b, by="x.x")
-    
-    qale[ , dQALY := bigb_xfoo/l_person]
-    
-    ######### calculating covid19 loss #######
-    
-    
-    age_bands[ , midpoint := ceiling((low+high)/2)]
-    
-    cov <- merge(qale, age_bands, by.x="x.x", by.y="midpoint", all=FALSE)
-    
-    ### ADDING AGE GROUP BREAKDOWN TABLE
-    cov[,"Age Group":=paste(cov[,low],cov[,high],sep="-")]
-    setnames(cov, old=c("LE_x","qale_x","dQALY"),
-             new=c("LE","QALE","dQALY"))
-    
-    agetab <- cov[ , c("Age Group",
-                       "LE","QALE","dQALY")]
-    
-    list( agetab=agetab)
-  })
-  
-  
-  output$agetab <- renderTable(QoLmodel()$agetab, bordered = TRUE)
-  
-  # Single run ICER object -----------------------------------------------------
-  
-  
-  
-  ### ICER plots
-  
-  
-  icer_object <- eventReactive(input$add,{
-    
-    # Inputs
-    set.seed(131)
-    n_samples <- 200
-    n<-n_samples 
-    cohort_size<-input$n
-    time_horizon<-input$t_hor
-    will_to_pay=input$will_to_pay
-    tpt_cov<-input$casc1/100
-    tpt_compl<-input$casc2/100
-    tpt_cost_lfup<-input$cost_ltfup
-    dr<-input$disc_rate/100
-    #CFR Crofts et al2008
-    cfr <- c(0.012,0.012,0.048,0.176)
-    frac_eptb<-0.2
-    av_tbdur <- 2
-    frac_post<-0.25 # https://karger.com/res/article/100/8/751/820992/Post-Tuberculosis-Lung-Disease-Clinical-Review-of
-    qol_tab<- QoLmodel()$agetab
-    
-    tpt_eff<-0
-    tpt_ae<-0
-    if (input$tpt == "6INH"){
-      tpt_eff <- 0.6  
-      tpt_ae <- 0.04 
-    } else if(input$tpt =="3HP"){
-      tpt_eff <- 0.53 
-      tpt_ae <- 0.08
-    } else if(input$tpt =="3RH"){
-      tpt_eff <- 0.6 
-      tpt_ae <- 0.039
-    }
-    
-    
-    # Functions
-    estBetaParams <- function(mu, var) {
-      alpha <- ((1 - mu) / var - 1 / mu) * mu ^ 2
-      beta <- alpha * (1 / mu - 1)
-      return(params = list(alpha = alpha, beta = beta))
-    }
-    
-    
-    
-    # Campaign costs
-    cost_camp<- 0
-    cost_campsd<-  0 
-    cost_campmin<-  0
-    cost_campmax<-  0
-    cost_campshape<-  0
-    
-    if (input$campcost_dist =="Gamma"){
-      cost_camp<- input$cost_camp_gamma
-      cost_campsd<-  input$cost_campsd_gamma#(xmax-xmin)/3.92 
-      cost_campmin<-  NA
-      cost_campmax<-  NA
-      cost_campshape<-  NA
-      
-      xmean<-input$cost_camp_gamma
-      sd<- input$cost_campsd_gamma#(xmax-xmin)/3.92 
-      shape<- (xmean^2)/(sd^2)
-      sim_camp_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
-      
-    } else if (input$campcost_dist =="PERT"){
-      
-      cost_campsd<-  NA 
-      cost_camp<-  input$cost_camp_pert
-      cost_campmin<-  input$cost_campmin_pert
-      cost_campmax<-  input$cost_campmax_pert
-      cost_campshape<-  input$cost_camplam
-      
-      xmean<-input$cost_camp_pert
-      xmin<-input$cost_campmin_pert
-      xmax<-input$cost_campmax_pert
-      lam<- input$cost_camplam
-      sim_camp_cost<-rpert(n,xmin,xmax,xmean,lam)
-    }
-    
-    #campaing
-    
-    
-    ## test
-    cost_test<- 0
-    cost_testsd<-  0 
-    cost_testmin<-  0
-    cost_testmax<-  0
-    cost_testshape<-  0
-    if (input$testcost_dist =="Gamma"){
-      
-      cost_test<- input$cost_test_gamma
-      cost_testsd<-  input$cost_testsd_gamma
-      cost_testmin<-  NA
-      cost_testmax<-  NA
-      cost_testshape<-  NA
-      
-      xmean<-input$cost_test_gamma
-      sd<- input$cost_testsd_gamma# (xmax-xmin)/3.92 
-      shape<- (xmean^2)/(sd^2)
-      sim_test_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
-      
-    } else if (input$testcost_dist =="PERT"){
-      
-      cost_test<-input$cost_test_pert
-      cost_testsd<-  NA 
-      cost_testmin<-  input$cost_testmin_pert
-      cost_testmax<-  input$cost_testmax_pert
-      cost_testshape<-  input$cost_testlam
-      
-      xmean<-input$cost_test_pert
-      xmin<-input$cost_testmin_pert
-      xmax<-input$cost_testmax_pert
-      lam<- input$cost_testlam
-      sim_test_cost<-rpert(n,xmin,xmax,xmean,lam)
-    }
-    
-    
-    
-    ## TPT cost
-    cost_tpt<- 0
-    cost_tptsd<-  0 
-    cost_tptmin<-  0
-    cost_tptmax<-  0
-    cost_tptshape<-  0
-    if (input$tptcost_dist =="Gamma"){
-      cost_tpt<- input$cost_tpt_gamma
-      cost_tptsd<-  input$cost_tptsd_gamma 
-      cost_tptmin<-  NA
-      cost_tptmax<-  NA
-      cost_tptshape<-  NA
-      xmean<-input$cost_tpt_gamma
-      # xmin<-input$cost_tptmin_gamma
-      # xmax<-input$cost_tptmax_gamma
-      sd<- input$cost_tptsd_gamma#(xmax-xmin)/3.92 
-      shape<- (xmean^2)/(sd^2)
-      sim_tpt_cost  <- rgamma(n,shape=shape, rate=shape/xmean)
-      
-    } else if (input$tptcost_dist =="PERT"){
-      cost_tpt<- input$cost_tpt_pert
-      cost_tptsd<-  NA 
-      cost_tptmin<- input$cost_tptmin_pert 
-      cost_tptmax<-  input$cost_tptmax_pert
-      cost_tptshape<-  input$cost_tptlam
-      xmean<-input$cost_tpt_pert
-      xmin<-input$cost_tptmin_pert
-      xmax<-input$cost_tptmax_pert
-      lam<- input$cost_tptlam
-      sim_tpt_cost<-rpert(n,xmin,xmax,xmean,lam)
-    }
-    
-    
-    
-    # TB QOL
-    qol_tb<- 0
-    qol_tbsd<-  0 
-    qol_tbmin<-  0
-    qol_tbmax<-  0
-    qol_tbshape<-  0
-    if (input$ptbqol_dist =="Beta"){
-      qol_tb<- input$qol_ptb_beta
-      qol_tbsd<-  input$qol_ptbsd_beta 
-      qol_tbmin<-  NA
-      qol_tbmax<-  NA
-      qol_tbshape<-  NA
-      xmean<-input$qol_ptb_beta
-      # xmin<-input$qol_ptbmin_beta
-      # xmax<-input$qol_ptbmax_beta
-      sd<- input$qol_ptbsd_beta# (xmax-xmin)/3.92 
-      pars_beta<-estBetaParams(xmean,sd^2 )
-      sim_tb_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
-      
-    } else if (input$ptbqol_dist =="PERT"){
-      qol_tb<- input$qol_ptb_pert
-      qol_tbsd<-  NA 
-      qol_tbmin<-  input$qol_ptbmin_pert
-      qol_tbmax<-  input$qol_ptbmax_pert
-      qol_tbshape<- input$qol_ptblam_pert
-      xmean<-input$qol_ptb_pert
-      xmin<-input$qol_ptbmin_pert
-      xmax<-input$qol_ptbmax_pert
-      lam<- input$qol_ptblam_pert
-      sim_tb_qol<-rpert(n,xmin,xmax,xmean,lam)
-      
-    }
-    
-    
-    #EPTB QoL
-    qol_eptb<- 0
-    qol_eptbsd<-  0 
-    qol_eptbmin<-  0
-    qol_eptbmax<-  0
-    qol_eptbshape<-  0
-    if (input$eptbqol_dist =="Beta"){
-      qol_eptb<- input$qol_eptb_beta
-      qol_eptbsd<- input$qol_eptbsd_beta
-      qol_eptbmin<-  NA
-      qol_eptbmax<-  NA
-      qol_eptbshape<- NA
-      xmean<-input$qol_eptb_beta
-      # xmin<-input$qol_eptbmin_beta
-      # xmax<-input$qol_eptbmax_beta
-      sd<- input$qol_eptbsd_beta#(xmax-xmin)/3.92 
-      pars_beta<-estBetaParams(xmean,sd^2 )
-      sim_eptb_qol  <- rbeta(n,pars_beta$alpha, pars_beta$beta)
-      
-    } else if (input$eptbqol_dist =="PERT"){
-      qol_eptb<- input$qol_eptb_pert
-      qol_eptbsd<-  NA 
-      qol_eptbmin<-  input$qol_eptbmin_pert
-      qol_eptbmax<-  input$qol_eptbmax_pert
-      qol_eptbshape<- input$qol_eptblam_pert
-      xmean<-input$qol_eptb_pert
-      xmin<-input$qol_eptbmin_pert
-      xmax<-input$qol_eptbmax_pert
-      lam<- input$qol_eptblam_pert
-      sim_eptb_qol <-rpert(n,xmin,xmax,xmean,lam)
-      
-    }
-    
-    # POstTB QoL
-    qol_postb<- 0
-    qol_postbsd<-  0 
-    qol_postbmin<-  0
-    qol_postbmax<-  0
-    qol_postbshape<-  0
-    if (input$postqol_dist =="Beta"){
-      qol_postb<- input$qol_post_beta
-      qol_postbsd<-  input$qol_postsd_beta 
-      qol_postbmin<-  NA
-      qol_postbmax<-  NA
-      qol_postbshape<-  NA
-      xmean<-input$qol_post_beta
-      # xmin<-input$qol_postmin_beta
-      # xmax<-input$qol_postmax_beta
-      sd<- input$qol_postsd_beta#(xmax-xmin)/3.92 
-      pars_beta<-estBetaParams(xmean,sd^2 )
-      sim_post_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
-      
-    } else if (input$postqol_dist =="PERT"){
-      qol_postb<- input$qol_post_pert
-      qol_postbsd<-  NA 
-      qol_postbmin<-  input$qol_postmin_pert
-      qol_postbmax<-  input$qol_postmax_pert
-      qol_postbshape<-  input$qol_postlam_pert
-      xmean<-input$qol_post_pert
-      xmin<-input$qol_postmin_pert
-      xmax<-input$qol_postmax_pert
-      lam<- input$qol_postlam_pert
-      sim_post_qol<-rpert(n,xmin,xmax,xmean,lam)
-      
-    }
-    
-    #AE TPT QOL
-    if (input$aeqol_dist =="Beta"){
-      
-      xmean<-input$qol_ae_beta
-      # xmin<-input$qol_aemin_beta
-      # xmax<-input$qol_aemax_beta
-      sd<- input$qol_aesd_beta#(xmax-xmin)/3.92 
-      pars_beta<-estBetaParams(xmean,sd^2 )
-      sim_ae_qol <- rbeta(n,pars_beta$alpha, pars_beta$beta)
-      
-    } else if (input$aeqol_dist =="PERT"){
-      
-      xmean<-input$qol_ae_pert
-      xmin<-input$qol_aemin_pert
-      xmax<-input$qol_aemax_pert
-      lam<- input$qol_aelam_pert
-      sim_ae_qol<-rpert(n,xmin,xmax,xmean,lam)
-      
-    }
-    
-    
-    
-    
-    
-    
-    
-    # Table of inputs
-    Table_input <- data.frame(
-      Parameter = c("Cohort size", 
-                    "Time horizon", 
-                    "Willingness to pay",
-                    "TPT",
-                    "TPT effectiveness",
-                    "TPT coverage",
-                    "TPT completion",
-                    "TPT cost in LFUP",
-                    "Cost of campaign",
-                    "Cost of campaign SD (Gamma)",
-                    "Cost of campaign min (PERT)",
-                    "Cost of campaign max (PERT)",
-                    "Cost of campaign shape (PERT)",
-                    "Cost of TBI test",
-                    "Cost of TBI test SD (Gamma)",
-                    "Cost of TBI test min (PERT)",
-                    "Cost of TBI test max (PERT)",
-                    "Cost of TBI test shape (PERT)",
-                    "Cost of TPT",
-                    "Cost of TPT SD (Gamma)",
-                    "Cost of TPT min (PERT)",
-                    "Cost of TPT max (PERT)",
-                    "Cost of TPT shape (PERT)",
-                    "Discount rate",
-                    "QoL of TB disease",
-                    "QoL of TB disease SD (Gamma)",
-                    "QoL of TB disease min (PERT)",
-                    "QoL of TB disease max (PERT)",
-                    "QoL of TB disease shape (PERT)",
-                    "QoL of EPTB disease",
-                    "QoL of EPTB disease SD (Gamma)",
-                    "QoL of EPTB disease min (PERT)",
-                    "QoL of EPTB disease max (PERT)",
-                    "QoL of EPTB disease shape (PERT)",
-                    "QoL of Post-TB disease",
-                    "QoL of Post-TB disease SD (Gamma)",
-                    "QoL of Post-TB disease min (PERT)",
-                    "QoL of Post-TB disease max (PERT)",
-                    "QoL of Post-TB disease shape (PERT)"
-                    
-      ),
-      Current_scenario =c( input$n, 
-                           input$t_hor, 
-                           input$will_to_pay,
-                           input$tpt,
-                           tpt_eff,
-                           tpt_cov,
-                           tpt_compl,
-                           tpt_cost_lfup,
-                           cost_camp,
-                           cost_campsd,
-                           cost_campmin,
-                           cost_campmax,
-                           cost_campshape,
-                           cost_test,
-                           cost_testsd, 
-                           cost_testmin,
-                           cost_testmax,
-                           cost_testshape,
-                           cost_tpt,
-                           cost_tptsd, 
-                           cost_tptmin,
-                           cost_tptmax,
-                           cost_tptshape,
-                           dr,
-                           qol_tb,
-                           qol_tbsd, 
-                           qol_tbmin,
-                           qol_tbmax,
-                           qol_tbshape,
-                           qol_eptb,
-                           qol_eptbsd, 
-                           qol_eptbmin,
-                           qol_eptbmax,
-                           qol_eptbshape,
-                           qol_postb,
-                           qol_postbsd, 
-                           qol_postbmin,
-                           qol_postbmax,
-                           qol_postbshape
-                           
-                           
-      )
-    )
-    
-    cohort_size<-input$n
-    time_horizon<-input$t_hor
-    will_to_pay=input$will_to_pay
-    
-    
-    #Define variables
-    base1<-df()$base1
-    npositives<- df()$npositives
-    
-    # Yearly predictions
-    predictions<-matrix(0,nrow = cohort_size, ncol = time_horizon)
-    predictions_sd<-matrix(0,nrow = cohort_size, ncol = time_horizon)
-    
-    for (ii in 2:time_horizon){
-      base1$studytime <- (365*ii)-42
-      preds <- as.data.frame((predict(model, base1, type="fail", se.fit=T)))
-      p_in<-preds[,1]
-      predictions[,ii]<-p_in 
-      predictions_sd[,ii]<- (preds[,3] - preds[,2])/3.92
-      
-    }
-    
-    
-    # 
-    # Use mean and SD of predictions to generate new and different probabilities
-    # for each cohort individual
-    
-
-    
-    # Function to generate random number for each element
-    # generate_random_numbers <- function(a, b) {
-    #   rnorm(1, mean = b, sd = a)
-    # }
-    # 
-    # # Apply the function to matrices A and B using mapply
-    # C <- mapply(generate_random_numbers, predictions_sd, predictions)
-    # 
-    # 
-    # # Convert the resulting vector C back to a matrix with the same dimensions as A and B
-    # probs_history <- matrix(C, nrow = nrow(predictions_sd), ncol = ncol(predictions_sd))
-    # 
-    # # Simulate (binomial) the Tb cases according to probability in time
-    # # The result is history of 0s and 1s for each cohort member,
-    # # where the column dimension is each year of the time_horizon
-    
-    p<-matrix(runif(cohort_size*time_horizon), nrow=cohort_size)
-    logical_matrix <- p < predictions
-    
-    
-    # Function to keep only the first TRUE in each row
-    # keep_first_true <- function(row) { # Infection only occurs once in timeline
-    #   idx <- which(row)
-    #   if (length(idx) > 0) {
-    #     row[-idx[1]] <- FALSE
-    #   }
-    #   return(row)
-    # }
-    # 
-    # # Apply the function to each row of the logical matrix
-    # cases_history <- t(apply(logical_matrix, 1, keep_first_true)) * 1
-    # 
-    # 
-    # #tmp<-data.frame(age=base1$agespl1,cases_history)
-    
-    
-    tmp<-data.frame(age=base1$agespl1,logical_matrix*1)
-    
-    
-    # Cumulative TB cases by age 
-    sim_cases_age<-tmp %>%
-      group_by(age) %>%
-      summarise(across(everything(), ~ sum(., na.rm = TRUE)))
-  
-    # Draw TB deaths from cases
-    exp_prob<-replicate(time_horizon,cfr) 
-    
-    binom_draw<- function(n,p){
-      rbinom(n=1, size=n, prob=p)
-    }
-    
-    sim_cases_age<-sim_cases_age[,2:ncol(sim_cases_age)]
-    sim_cases_age_eptb<- round(sim_cases_age * frac_eptb)
-    sim_cases_age_ptb <- sim_cases_age-sim_cases_age_eptb
-    
-    c<-mapply(binom_draw,sim_cases_age_ptb,exp_prob)
-    sim_deaths <- matrix(c, nrow = nrow(sim_cases_age_ptb), ncol = ncol(logical_matrix))
-    
-    
-    # Cases and deaths under interventions
-    exp_prob_itv<-matrix(tpt_eff,nrow = nrow(sim_cases_age), ncol = ncol(logical_matrix) )
-    c<-mapply(binom_draw,sim_cases_age,exp_prob_itv)
-    sim_cases_age_itv <- matrix(c, nrow = nrow(sim_cases_age), ncol = ncol(logical_matrix))
-    sim_cases_age_eptb_itv<- round(sim_cases_age_itv * frac_eptb)
-    sim_cases_age_ptb_itv <- sim_cases_age_itv-sim_cases_age_eptb_itv
-    
-    c<-mapply(binom_draw,sim_cases_age_ptb_itv,exp_prob)
-    sim_deaths_itv <- matrix(c, nrow = nrow(sim_cases_age_ptb_itv), ncol = ncol(logical_matrix))
-    
-    qol<- QoLmodel()$agetab$dQALY
-    
-    baseline_qaly<- table(base1$agespl1) * qol
-    qaly_loss_deaths<- colSums(sim_deaths * qol)
-    qaly_loss_deaths_itv<- colSums(sim_deaths_itv * qol)
-    
-    
-    qaly<-matrix(0,nrow = n_samples, ncol=time_horizon)
-    qaly_itv<-matrix(0,nrow = n_samples, ncol=time_horizon)
-    qaly_margin<-matrix(0,nrow = n_samples, ncol=time_horizon)
-    
-    cost<-matrix(0,nrow = n_samples, ncol=time_horizon)
-    cost_itv<-matrix(0,nrow = n_samples, ncol=time_horizon)
-    cost_margin<-matrix(0,nrow = n_samples, ncol=time_horizon)
-    
-    
-    tmp<-matrix(1,nrow = 1, ncol=time_horizon)
-    
-    discount_matrix<-((tmp)/((1 + dr)^ seq_len(ncol(tmp)) ))
-    qol_exp<-matrix(rep(qol,n_samples), nrow = nrow(sim_cases_age_ptb_itv), ncol = time_horizon )
-    
-
-    
-    qaly_loss_ptb <- t(t(discount_matrix * colSums(sim_cases_age_ptb))  %*%   (sim_tb_qol * av_tbdur))
-    qaly_loss_eptb<- t(t(discount_matrix * colSums(sim_cases_age_eptb))  %*%   (sim_eptb_qol * av_tbdur))
-    qaly_loss_ptb_itv <- t(t(discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv)))  %*%   (sim_tb_qol * av_tbdur))
-    qaly_loss_eptb_itv<- t(t(discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv)))  %*%   (sim_eptb_qol * av_tbdur))
-    qaly_loss_post <-t(colSums((sim_cases_age_ptb - sim_deaths)* frac_post * qol)  %*% t(sim_post_qol)) 
-    qaly_loss_post_itv <-t(colSums(as.data.frame((sim_cases_age_ptb_itv - sim_deaths_itv)* frac_post * qol))  %*% t(sim_post_qol)) 
-    qaly_loss_AE_itv<- npositives * tpt_cov  * tpt_ae * sim_ae_qol
-    
-    deaths_loss<-t(replicate(n_samples,qaly_loss_deaths)) 
-    deaths_loss_itv<-t(replicate(n_samples,qaly_loss_deaths_itv)) 
-    
-    qaly<-     sum(baseline_qaly)- (qaly_loss_ptb + qaly_loss_eptb + qaly_loss_post + deaths_loss) 
-    qaly_itv<- sum(baseline_qaly)- (qaly_loss_ptb_itv + qaly_loss_eptb_itv + 
-                                      qaly_loss_post_itv + deaths_loss_itv+qaly_loss_AE_itv) 
-    
-    qaly_margin<-qaly_itv-qaly
-    
-    #Costs
-    
-    tbtx_cost<- t(replicate(n_samples, drop(discount_matrix) * drop(colSums(sim_cases_age))*  tbtx_cost_yr)) 
-    tbtx_cost_itv<- t(replicate(n_samples, drop(discount_matrix) * drop(colSums(sim_cases_age_itv))*  tbtx_cost_yr)) 
-    
-    
-    itv_start_cost<-replicate(time_horizon, sim_test_cost * cohort_size + 
-      npositives * tpt_cov * tpt_compl * sim_tpt_cost + 
-      npositives * tpt_cov * (1-tpt_compl) * sim_tpt_cost * tpt_cost_lfup + sim_camp_cost)
-    
-    
-    
-    cost<- tbtx_cost
-    cost_itv<- tbtx_cost_itv + itv_start_cost
-    cost_margin<- cost_itv- cost
-    
-
-    
-    # 
-    # for (ii in 1:n_samples){
-    #   
-    #   qaly_loss_ptb <- discount_matrix * colSums(sim_cases_age_ptb * sim_tb_qol[ii] * av_tbdur)
-    #   
-    #   
-    #   qaly_loss_eptb <- discount_matrix *colSums(sim_cases_age_eptb * sim_eptb_qol[ii] * av_tbdur)
-    #   
-    #   
-    #   qaly_loss_ptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv * sim_tb_qol[ii] * av_tbdur))
-    #   
-    #   
-    #   qaly_loss_eptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv * 
-    #                                                                   sim_eptb_qol[ii] * av_tbdur))
-    #   
-    #   qaly_loss_post<- colSums((sim_cases_age_ptb - sim_deaths)* frac_post * (qol - qol*(1-sim_post_qol[ii]))) 
-    #   
-    #   qaly_loss_post_itv<- colSums(as.data.frame((sim_cases_age_ptb_itv - 
-    #                                                 sim_deaths_itv) * frac_post * 
-    #                                                (qol - qol*(1-sim_post_qol[ii]))))
-    #   
-    #   qaly_loss_AE_itv <- npositives * tpt_cov  * tpt_ae * sim_ae_qol[ii]
-    #   
-    #   
-    #   qaly[ii,]<- sum(baseline_qaly) - qaly_loss_ptb - qaly_loss_eptb - 
-    #     qaly_loss_post - qaly_loss_deaths
-    #   
-    #   qaly_itv[ii,]<- sum(baseline_qaly) - qaly_loss_ptb_itv - qaly_loss_eptb_itv - 
-    #     qaly_loss_post_itv - qaly_loss_deaths_itv - qaly_loss_AE_itv 
-    #   
-    #   qaly_margin[ii,]<-qaly_itv[ii,]-qaly[ii,]
-    #   
-    #   # costs
-    #   
-    #   tbtx_cost<-discount_matrix * colSums(sim_cases_age ) *  tbtx_cost_yr
-    #   tbtx_cost_itv<- discount_matrix * colSums(sim_cases_age_itv) *  tbtx_cost_yr
-    #   
-    #   
-    #   itv_start_cost<- sim_test_cost[ii] * cohort_size + 
-    #     npositives * tpt_cov * tpt_compl * sim_tpt_cost[ii] + 
-    #     npositives * tpt_cov * (1-tpt_compl) * sim_tpt_cost[ii] * tpt_cost_lfup + 
-    #     sim_camp_cost[ii]
-    #   
-    #   
-    #   
-    #   cost[ii,]<- tbtx_cost
-    #   cost_itv[ii,]<- tbtx_cost_itv + itv_start_cost
-    #   cost_margin[ii,]<- cost_itv[ii,]- cost[ii,]
-    #   
-    #   
-    # }
-    
-    
-    
-    # QALY loss composition
-    
-    qaly_loss_ptb <- discount_matrix * colSums( sim_cases_age_ptb * 
-                                                  mean(sim_tb_qol) * av_tbdur)
-    qaly_loss_eptb <- discount_matrix * colSums( sim_cases_age_eptb * 
-                                                   mean(sim_eptb_qol) * av_tbdur)
-    
-    
-    qaly_loss_ptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_ptb_itv * 
-                                                                   mean(sim_tb_qol) * av_tbdur))
-    
-    
-    qaly_loss_eptb_itv <- discount_matrix * colSums(as.data.frame(sim_cases_age_eptb_itv * 
-                                                                    mean(sim_eptb_qol) * av_tbdur))
-    
-    qaly_loss_post<- colSums((sim_cases_age_ptb - sim_deaths)* frac_post *(qol - qol*(1-mean(sim_post_qol)))) 
-    
-    qaly_loss_post_itv<- colSums(as.data.frame((sim_cases_age_ptb_itv - 
-                                                  sim_deaths_itv)  * frac_post *(qol - qol*(1-mean(sim_post_qol))))) 
-    
-    
-    qaly_loss_AE_itv <- npositives * tpt_cov  * tpt_ae * mean(sim_ae_qol)
-    
-    qaly_loss_AE <- 0
-    
-    qaly_loss_dist<-rbind(Death=qaly_loss_deaths,
-                          PTB=qaly_loss_ptb,
-                          EPTB=qaly_loss_eptb,
-                          POstTB=qaly_loss_post,
-                          AE=qaly_loss_AE)
-    
-    
-    qaly_loss_dist_itv<-rbind(Death=qaly_loss_deaths_itv,
-                              PTB=qaly_loss_ptb_itv,
-                              EPTB=qaly_loss_eptb_itv,
-                              PostTB=qaly_loss_post_itv,
-                              AE=qaly_loss_AE_itv)
-    
-    
-    
-    # Cost composition
-    
-    tbtx_cost<-as.numeric(discount_matrix * colSums(sim_cases_age ) *  tbtx_cost_yr)
-    tbtx_cost_itv<- as.numeric(discount_matrix * colSums(sim_cases_age_itv) *  tbtx_cost_yr)
-    
-    
-    test_cost_itv<- mean(sim_test_cost) * cohort_size 
-    tpt_cost_itv<-  npositives * tpt_cov * tpt_compl * mean(sim_tpt_cost) + 
-      npositives * tpt_cov * (1-tpt_compl) * mean(sim_tpt_cost) * tpt_cost_lfup  
-    camp_cost_itv<-  mean(sim_camp_cost)
-    
-    test_cost<- 0 
-    tpt_cost<- 0  
-    camp_cost<- 0
-    
-    cost_dist<- rbind(TBtx =tbtx_cost,
-                      LTBITests=test_cost,
-                      TPT = tpt_cost,
-                      Campaign=camp_cost)
-    
-    cost_dist_itv<- rbind(TBtx=tbtx_cost_itv,
-                          LTBITests=test_cost_itv,
-                          TPT = tpt_cost_itv,
-                          Campaign=camp_cost_itv)
-    
-    
-    
-    #INB
-    lambda<-seq(0,50000,1000)
-    inb<-lambda%*%t(qaly_margin[,time_horizon]) - t(replicate(length(lambda),cost_margin[,time_horizon]))
-    
-    df_inb <- as.data.frame(
-      rowQuantiles(inb,
-                   probs = c(0.025, 0.5, 0.975)
-      )
-    )
-    df_inb$x<-lambda
-
-    
-    
-    # Incremental Net Benefit
-    
-    
-    
-    # ICER  objects
-    treats=c("No intervention", "Intervention")
-    eff=cbind(qaly[,time_horizon],qaly_itv[,time_horizon])
-    cost=cbind(cost[,time_horizon],cost_itv[,time_horizon])
-    
-    QALYdist=cbind(qaly_loss_dist[,time_horizon],qaly_loss_dist_itv[,time_horizon])
-    colnames(QALYdist)<-paste(treats)
-    
-    Costdist=cbind(cost_dist[,time_horizon],cost_dist_itv[,time_horizon])
-    colnames(Costdist)<-paste(treats)
-    
-    
-    
-    out <-list(
-      cohort_size=input$n,
-      time_horizon=input$t_hor,
-      will_to_pay=input$will_to_pay,
-      treats=treats,
-      eff=eff,
-      cost=cost,
-      bcea_tb=bcea(eff,cost, ref=2,interventions=treats),
-      table=Table_input,
-      ICER =cost_margin/qaly_margin,
-      marginal_cost=cost_margin,
-      marginal_qaly=qaly_margin,
-      QALYdist=QALYdist,
-      Costdist=Costdist,
-      INB=df_inb
-    )
-    
-    return(out)
-    
-  })
-  
-  
-  
-  # ICER plane --------------------------------------------------------------
-  
-  
-  observeEvent(input$add, {
-    
-    
-    output$ICER <- renderValueBox({
-      #req(input$will_to_pay)
-      will_to_pay=input$will_to_pay
-      obj<-icer_object()
-      bceares<- obj$bcea_tb
-      icer<-bceares$ICER
-      valueBox(
-        value = tags$p(scales::dollar(icer, prefix = ''),#formatC(icer, digits = 0, format = "f"),
-                       style = "color:white;font-size:28px;"), 
-        subtitle = "ICER (£/QALY)",
-        icon = icon("bullseye"),
-        color = if (icer <= will_to_pay) "yellow" else "red"
-      )
-    })
-    
-    
-    
-    output$costsaved <- renderValueBox({
-      obj<-icer_object()
-      bceares<- obj$bcea_tb
-      x<-mean(unlist(obj$bcea_tb$delta_c),na.rm=TRUE)
-      valueBox(
-        value =  tags$p(scales::dollar(x, prefix = '£'),
-                        style = "color:white;font-size:28px;"), 
-        subtitle = "Mean Incremental cost (£)",
-        icon = icon("sterling-sign"),
-        color =  "aqua"
-      )
-    })
-    
-    
-    output$qalygained <- renderValueBox({
-      obj<-icer_object()
-      bceares<- obj$bcea_tb
-      x<-mean(unlist(obj$bcea_tb$delta_e),na.rm=TRUE)
-      valueBox(
-        value = tags$p(formatC(x, digits = 0, format = "f"),
-                       style = "color:white;font-size:28px;"), 
-        subtitle = "Mean Incremental QALY",
-        icon = icon("person"),
-        color =  "aqua"
-      )
-    })
-    
-    
-    output$plot_icer <- renderPlot({
-      #req(input$will_to_pay)
-      obj<-icer_object()
-      bceares<- obj$bcea_tb
-      will_to_pay=input$will_to_pay
-      icercol<-"#FF3333"
-      plot(bceares, 
-           wtp =will_to_pay,
-           graph="ggplot2",
-           line = list(color = "grey40"),
-           point = list(color = "blue"),
-           icer = list(color = icercol, size = 3),
-           area = list(fill = "lightcyan"),
-           theme = theme_minimal())
-      
-    })
-    
-    output$plot_contour <- renderPlot({
-      #req(input$will_to_pay)
-      obj<-icer_object()
-      bceares<- obj$bcea_tb
-      will_to_pay=input$will_to_pay
-      
-      contour2(bceares, 
-               wtp =will_to_pay,
-               graph = "ggplot2",
-               xlabel = "Incremental QALY" )
-    })
-    
-    output$plot_wtp <- renderPlot({
-      # req(input$will_to_pay)
-      obj<-icer_object()
-      bceares<- obj$bcea_tb
-      icers<- bceares$delta_c/bceares$delta_e
-      val1<-length(which(icers<20000))/dim(icers)[1] 
-      val2<-length(which(icers<30000))/dim(icers)[1]
-      
-      
-      
-      
-      df<-data.frame(
-        pos = c(1 ,3),
-        val = c(val1*1e2,val2*1e2),
-        cat = c("£20k","£30k")
-      )
-      
-      p<-ggplot(df, aes(x=cat, y=val))+
-        geom_bar(stat="identity", fill=c('firebrick',"darkgreen"),  alpha=0.35)+
-        ylim(c(0,100))+
-        geom_segment(aes(x = 0.75, y = 50, xend = 1.25, yend = 50), size=1,linetype='dotted', col = 'firebrick')+
-        geom_segment(aes(x = 1.75, y = 90, xend = 2.25, yend = 90),size=1,linetype='dotted', col = 'darkgreen')+
-        labs(
-          title = "Cost-effectiveness thresholds at £20k and £30k per QALY"
-        )+
-        xlab(" ")+
-        ylab("Simulations under specific WTP (%)")+
-        theme_minimal()+
-        theme(
-          text = element_text(size=20),
-          axis.text.x = element_text(angle=60, hjust=1))
-      
-      
-      gridExtra::grid.arrange(p)  
-      
-    })
-    
-    # Download CSV
-    output$table <- renderTable({
-      dfage()
-    })
-    
-    # Download single parameters ----------------------------------------------
-    
-    output$btndcsv <-
-      downloadHandler(
-        filename = function () {
-          paste("parameters.csv", sep = "")
-        },
-        content = function(file) {
-          write.csv(dfage(), file)
-        }
-      )
-    
-
-    # INB plot ----------------------------------------------------------------
-    
-    output$plot_INB <- renderPlot({
-      # req(input$will_to_pay)
-      df<-icer_object()$INB
-
-      
-      p <- ggplot(data = df, aes(x = x)) +
-        geom_ribbon(aes(ymin = `2.5%`, ymax = `97.5%`), fill ='darkorange', alpha = 0.2) +
-        geom_line(aes(y = `50%`), col = 'darkorange', lwd = 1) +
-        labs(
-          title = "Incremental Net Benefit Analysis"
-        )+
-        xlab("WTP (£/QALY)")+
-        ylab("Net Benefit (£)")+
-        theme_minimal()+
-        theme(
-          text = element_text(size=20),
-          axis.text.x = element_text(angle=60, hjust=1))
-  
-      gridExtra::grid.arrange(p) 
-      
-      
-    })
-    
-
-
-    # QALY break --------------------------------------------------------------
-
-    output$plot_QALYbreak <- renderPlot({
-      # req(input$will_to_pay)
-      obj<-icer_object()
-      df<-data.frame(obj$QALYdist)
-      df$Category<-c("Death","PTB","EPTB","PTBLD", "AE")
-    
-      
-      dfm<-reshape2::melt(df)
-      
-      p<-ggplot(dfm,aes(x=variable, y=value, fill=Category))+
-        geom_bar(stat = "identity")+
-        labs(
-          title = "Breakdown of QALYs lost"
-        )+
-        xlab(" ")+
-        ylab("QALYs Lost")+
-        scale_fill_manual(values = c( 'navy','gold', 'darkorange','green4','grey38')) +
-        theme_minimal()+
-        theme(
-          text = element_text(size=20),
-          axis.text.x = element_text(angle=60, hjust=1))
-      
-      gridExtra::grid.arrange(p) 
-        
-      
-    })
-    
-  
-    
-    
-
-    # Cost breakdown ----------------------------------------------------------
-
-    
-    output$plot_Costbreak <- renderPlot({
-    
-      obj<-icer_object()
-      df<-data.frame(obj$Costdist)
-      df$Category<-c("TB treatment","LTBI test","TPT","Campaign")
-      
-      dfm<-reshape2::melt(df)
-      dfm1<-dfm[dfm$Category=="TB treatment",]
-      dfm2<-dfm[dfm$Category != "TB treatment",]
-      dfm2<-dfm2[dfm2$variable=="Intervention",]
-
-      p1<-ggplot(dfm1,aes(x=variable, y=value))+
-        geom_bar(stat = "identity", fill='green4')+
-        labs(
-          title = "Costs of treating TB cases"
-        )+
-        xlab(" ")+
-        ylab("Cost (£)")+
-        theme_minimal()+
-        theme(
-          text = element_text(size=20),
-          axis.text.x = element_text(angle=60, hjust=1))
-      
-      
-      p2<-ggplot(dfm2,aes(x=variable, y=value, fill=Category))+
-        geom_bar(stat = "identity")+
-        labs(
-          title = "Breakdown of Intervention Costs"
-        )+
-        xlab(" ")+
-        ylab("Cost (£)")+
-        scale_fill_manual(values = c('deeppink3','grey38','gold')) +
-        theme_minimal()+
-        theme(
-          text = element_text(size=20),
-          axis.text.x = element_text(angle=60, hjust=1))
-      
-      gridExtra::grid.arrange(p1,p2, nrow=1) 
-      
-      
-    })
-    
-    
-    # Produce markdown report -------------------------------------------------
-    
-    
-    output$btn <- downloadHandler(
-      
-      filename = function(){"myreport.pdf"},
-      content = function(file) {
-        
-        tempReport <- file.path(tempdir(),"markdown_template.Rmd")
-        file.copy("markdown_template.Rmd", tempReport, overwrite = TRUE)
-        rmarkdown::render("markdown_template.Rmd", output_format = "pdf_document", output_file = file,
-                          params = list(data = icer_object()), # here I'm passing data in params
-                          envir = new.env(parent = globalenv()),clean=F,encoding="utf-8"
-        )
-        
-        
-      }
-    )
-    
-    ########### Scenarios 
-    
-    # Scenarios ---------------------------------------------------------------
-    
-    
-    # Table_params
-    output$table_params <- renderTable({
-      icer_object()$table
-    })
     
     
   })
