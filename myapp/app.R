@@ -3,11 +3,14 @@
 rm(list = ls()) 
 gc()
 
+library(readr)
+require(shinyjs)
 require(shiny)
 require(shinythemes)
 require(xlsx)
 library(shinydashboard)
 library(shinyvalidate)
+library(shinyalert)
 library(DT)
 library(tidyverse)
 library(reshape2)
@@ -22,6 +25,7 @@ library(BCEA)
 library(ggplot2)
 library(purrr)
 library(matrixStats)
+library(waiter)
 
 
 # path_app<-rstudioapi::getSourceEditorContext()$path
@@ -54,6 +58,7 @@ country_tb_inc <- country_tb_inc %>% select(country, year, e_inc_100k) %>%
 
 
 tests <- c("QuantiFERON", "T-SPOT.TB", "Tuberculin Skin Test")
+regimens<-c("6INH","3HP", "3RH")
 
 age_uk <- t(data.frame("A_16to35"=c(14),
                        "A_36to45"=c(32),
@@ -77,21 +82,6 @@ qaly_input<-list(
   age_bands= as.data.table(read.xlsx("Inputs/inputs.xlsx", 5))
 )
 
-##### temp Values
-## Epi
-# cohort_size<-5000
-# test<-"quantiferon" # tst or tspot
-# country <- "Pakistan"
-# time_horizon<-20
-
-# 
-# 
-# 
-# ## Costs
-# tpt_cost <- 100  # once
-# test_cost <- 50 # once
-tbtx_cost_yr <- 6000 ## per year
-
 
 ## QoL from Kind eta l 1999
 qol_full <- t(data.frame("A_16to35"=c(0.94),
@@ -99,9 +89,11 @@ qol_full <- t(data.frame("A_16to35"=c(0.94),
                          "A_46to65"=c(0.823),
                          "A_65plus"=c(0.7525)))
 
-
-
 age.categorical <- Categorical(rownames(age_uk), p = age_uk/100)
+
+# Template for batch runs
+
+batch_temp <- read.csv("template.csv")
 
 
 # UI  Menu---------------------------------------------------------------------
@@ -124,7 +116,7 @@ ui <- dashboardPage(
                          menuSubItem("Output", tabName = "res_icer", icon = icon("bullseye"))
                 ),
                 menuItem("Scenarios", tabName = "scenarios", icon = icon("bar-chart")),
-                menuItem("Advanced", tabName = "advanced", icon = icon("bar-chart")),
+                menuItem("Batch run", tabName = "advanced", icon = icon("bar-chart")),
                 menuItem("About", tabName = "about", icon = icon("th"))
     )
   ),
@@ -387,7 +379,7 @@ ui <- dashboardPage(
                          selectInput("test",label = "Prefered test", choices = tests),
                   ),
                   column(6,
-                         selectInput("tpt", "Choose TPT regimen", c("6INH","3HP", "3RH")),
+                         selectInput("tpt", "Choose TPT regimen", regimens),
                   )
                 ),
                 
@@ -828,11 +820,22 @@ ui <- dashboardPage(
                                      box(
                                        sliderInput("will_to_pay", "Wilingness to pay (£)", 5000, 50000, 20000)
                                      ),
-                                     tags$head(
-                                       tags$style(HTML('#run{background:yellowgreen} #run{color:black}'))
-                                     ),
+                                     
                                      actionButton("run","Run"),
                                      downloadButton("btn", "Generate Report"),
+                                     
+                                     #styles
+                                     tags$head(
+                                       tags$style(" #btn{vertical-align:middle;
+                                                    background:darkslategrey;
+                                                    border-color:darkslategrey;
+                                                    color: white;}
+                                                    
+                                                    #run{vertical-align:middle;
+                                                    background:firebrick;
+                                                    border-color:firebrick;
+                                                    color: white;}")),
+                                     
                                      
                                    ),
                                    fluidRow(
@@ -937,7 +940,13 @@ ui <- dashboardPage(
                                      column(
                                        width = 4,
                                        downloadButton("down_pars", "Download scenario parameters (.csv)"),
-                                     )
+                                     ),
+                                     #styles
+                                     tags$head(
+                                       tags$style(" #down_pars{vertical-align:middle;
+                                                    background:darkslategrey;
+                                                    border-color:darkslategrey;
+                                                    color: white;}")),
                                    ),
                                    
                                    
@@ -985,64 +994,116 @@ ui <- dashboardPage(
                           
                           # Load
                           tabPanel("Load batch",
+                                   
+                                   tags$h2("Run a batch of scenarios and retrieve results"),
                                    br(),
-                                   tags$h3("Run a batch of scenarios and retrieve results"),
-                                   br(),
-                                   fluidRow(
-                                     column(
-                                       width = 3,
-                                       tags$h4('1) Download the batch run template '),
-                                       br(),
-                                       tags$h4('2) Download the parameter dictionary'),
-                                       br(),
-                                       tags$h4('3) Fill the template by adding new 
+                                   sidebarPanel(
+                                     
+                                     fluidRow(
+                                       column(
+                                         width = 8,
+                                         tags$h4('1) Download the batch run template '),
+                                         br(),
+                                         tags$h4('2) Download the parameter dictionary'),
+                                         br(),
+                                         tags$h4('3) Fill the template by adding new 
                                                columns to the template, making sure 
                                                to name each column appropriately*'),
-                                       br(),
-                                       tags$h4('4) Upload your batch file'),
-                                       
-                                       br(),
-                                       br(),
-                                       tags$h4('5) Run the analysis on all
+                                         br(),
+                                         tags$h4('4) Upload your batch file'),
+                                         
+                                         br(),
+                                         br(),
+                                         tags$h4('5) Run the analysis on all
                                                the scenarios uploaded'),
-                                       
-                                       br(),
-                                       tags$h4('6) Download results as .csv'),
-                                       
-                                     ),
-                                     column(
-                                       width = 3,
-                                       downloadButton("down_temp", "Download template (.csv)", class="butt"),
-                                       br(),
-                                       br(),
-                                       downloadButton("down_dict", "Download dictionary (.csv)", class="butt"),
-                                       br(),
-                                       br(),
-                                       br(),
-                                       br(),
-                                       br(),
-                                       br(),
-                                       br(),
-                                       fileInput("batch_file", label=NULL),
-                                       tags$style(".btn-file {background:white;} .btn-file {color:black;}"),
-                                       tags$head(tags$style(".butt{background:white;} .butt{color: black;}")),
-                                       tags$head(
-                                         tags$style(HTML('#run_batch{background:yellowgreen} #run_batch{color:black}'))
+                                         
+                                         br(),
+                                         br(),
+                                         tags$h4('6) Download results as .csv'),
+                                         
                                        ),
-                                   
-                                       actionButton("run_batch","Run batch"),
-                                       br(),
-                                       br(),
-                                       br(),
-                                       downloadButton("down_batch", "Download batch results (.csv)", class="butt")
-    
-
-                                     
+                                       column(
+                                         width = 3,
+                                         downloadButton("down_temp", "Download", class="butt"),
+                                         br(),
+                                         br(),
+                                         downloadButton("down_dict", "Download", class="butt"),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         fileInput("batch_file", label=NULL, 
+                                                   multiple = FALSE,
+                                                   accept = c("text/csv",
+                                                              "text/comma-separated-values,text/plain",
+                                                              ".csv")),
+                                         
+                                         # Styles
+                                         tags$head(
+                                           tags$style(".butt{vertical-align:middle;
+                                                    height: 40px;
+                                                    width: 120%;
+                                                    font-size: 13px;
+                                                    background:darkslategrey;
+                                                    border-color:darkslategrey;
+                                                    color: white;}
+                                                    
+                                                    .runbutt{vertical-align:middle;
+                                                    height: 40px;
+                                                    width: 120%;
+                                                    font-size: 13px; 
+                                                    background:firebrick;
+                                                    border-color:firebrick;
+                                                    color: white;}
+                                                    
+                                                    .btn-file{vertical-align:middle;
+                                                    font-size: 13px;
+                                                    background:darkslategrey;
+                                                    border-color:darkslategrey;
+                                                    color: white;}")),
+                                         
+                                         shinyjs::useShinyjs(),
+                                         useWaitress(),
+                                         actionButton("run_batch","Run batch",class="runbutt"),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         br(),
+                                         downloadButton("down_batch", "Download", class="butt")
+                                       ),
+                                       
                                      )
+                                   ),
+                                   mainPanel(
+                                     
+                                     fluidPage(
+                                       DT::dataTableOutput("batchtab"),
+                                       style = "height:600px; overflow-y: scroll;overflow-x: scroll;"
+                                     ),  
+                                     h5("* A syntactically valid name consists of letters, 
+                                        numbers and the dot or underline characters and starts 
+                                        with a letter or the dot not followed by a number. 
+                                        Names such as '.2way' are not valid, and neither are the reserved words.
+                                        See ?make.names in R")
                                    )
+                                   
+                                   
+                                   
                           ),
                           # Results
-                          tabPanel("Download results",
+                          tabPanel("Summary",
+                                   
+                                   fluidPage(
+                                     DT::dataTableOutput("batch__results"),
+                                     style = "height:600px; overflow-y: scroll;overflow-x: scroll;"
+                                   ) 
+                                   
+                                   
                           ),
                           
               )
@@ -2032,17 +2093,19 @@ server <- function(input, output,session) {
     
     # Download single parameters ----------------------------------------------
     
+    
+    par_tab<-reactive({
+      df= data.frame(
+        #  parameter=rownames(t(pars())),
+        Current=t(pars())
+      )
+    })
+    
     output$table <- renderTable(data.frame(
       parameter=rownames(t(pars())),
       Current=t(pars())
     ))
     
-    par_tab<-reactive({
-      df= data.frame(
-        parameter=rownames(t(pars())),
-        Current=t(pars())
-      )
-    })
     
     output$down_pars <-
       downloadHandler(
@@ -2055,38 +2118,6 @@ server <- function(input, output,session) {
         }
       )
     
-    output$down_temp <-
-      downloadHandler(
-        filename = function () {
-          paste("template.csv", sep = "")
-        },
-        
-        content = function(file) {
-          write.csv(par_tab(), file)
-        }
-      )
-    
-    output$down_dict <-
-      downloadHandler(
-        filename = function () {
-          paste("dictionary.csv", sep = "")
-        },
-        
-        content = function(file) {
-          write.csv(par_tab(), file)
-        }
-      )
-    
-    output$down_batch <-
-      downloadHandler(
-        filename = function () {
-          paste("batch_runs.csv", sep = "")
-        },
-        
-        content = function(file) {
-          write.csv(par_tab(), file)
-        }
-      )
     
     # INB plot ----------------------------------------------------------------
     
@@ -2287,6 +2318,48 @@ server <- function(input, output,session) {
   
   
   # Scenarios ---------------------------------------------------------------
+  myReactives <- reactiveValues() 
+  temp_tab<-reactive({df=data.frame(batch_temp)})
+  observe(  myReactives$template <-  temp_tab()) 
+  
+  observe(myReactives$batch <-  input_file()) 
+  
+  
+  output$down_temp <-
+    downloadHandler(
+      filename = function () {
+        paste("template.csv", sep = "")
+      },
+      
+      content = function(fname) {
+        write_csv(myReactives$template, fname)
+      }
+    )
+  
+  
+  
+  output$down_dict <-
+    downloadHandler(
+      filename = function () {
+        paste("dictionary.csv", sep = "")
+      },
+      
+      content = function(file) {
+        write.csv(par_tab(), file)
+      }
+    )
+  
+  output$down_batch <-
+    downloadHandler(
+      filename = function () {
+        paste("batch_runs.csv", sep = "")
+      },
+      
+      content = function(file) {
+        write.csv(myReactives$batch_results, file)
+      }
+    )
+  
   
   output$table2 <- renderTable(data.frame(
     parameter=rownames(t(pars())),
@@ -2294,37 +2367,170 @@ server <- function(input, output,session) {
   ))
   
   
-
-# Batch runs --------------------------------------------------------------
-
   
+  
+  # Errors: Batch file Warnings --------------------------------------------------------------
+
   input_file <- reactive({
     if (is.null(input$batch_file)) {
-      return("")
+      shinyjs::disable("run_batch")
+      return(NULL)
+    }
+    else
+    {
+      
+      data<-read.csv(file = input$batch_file$datapath)
+  
+     
+      if(ncol(data)<ncol(myReactives$template))
+      {
+        shinyalert("Error","Uploaded Data has less cols than required",type="error")
+        returnValue()
+      }
+      else if(ncol(data)>ncol(myReactives$template))
+      {
+        shinyalert("Error","Uploaded Data has more cols than required",type = "error")
+        returnValue()
+      }
+      else if(prod(data$test %in% tests)<1)
+      {
+        shinyalert("Error","The test specified is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$cohort_mode %in% c('contact','new'))<1)
+      {
+        shinyalert("Error","The cohort mode specified is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$contact_type %in% c('household','other'))<1)
+      {
+        shinyalert("Error","The contact type specified is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$tpt %in% regimens)<1)
+      {
+        shinyalert("Error","The TPT regimen specified is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$campcost_dist %in% c("Gamma","PERT"))<1)
+      {
+        shinyalert("Error","The campaing cost distribution is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$testcost_dist %in% c("Gamma","PERT"))<1)
+      {
+        shinyalert("Error","The test cost distribution is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$tptcost_dist %in% c("Gamma","PERT"))<1)
+      {
+        shinyalert("Error","The TPT cost distribution is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$tbtxcost_dist %in% c("Gamma","PERT"))<1)
+      {
+        shinyalert("Error","The TP tx cost distribution is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$ptbqol_dist %in% c("Beta","PERT"))<1)
+      {
+        shinyalert("Error","The TB QoL distribution is not recognised",type = "error")
+        returnValue()
+      }
+      else if(prod(data$eptbqol_dist %in% c("Beta","PERT"))<1)
+      {
+        shinyalert("Error","The EPTB QoL distribution is not recognised",type = "error")
+        returnValue()
+      }
+      else if(sum(data<0))
+      {
+        shinyalert("Error","Negative values",type = "error")
+        returnValue()
+      }
+      
+      
+      else
+      {
+        shinyjs::enable("run_batch")
+        return(data)
+      }
     }
     
-    # actually read the file
-    read.csv(file = input$batch_file$datapath)
   })
   
-  output$batch_table <- DT::renderDataTable({
+  
+  
+  # Show batch table 
+  
+  output$batchtab <- DT::renderDataTable({
+    df<-t(data.frame(myReactives$batch))
+    colnames(df)<-myReactives$batch[,1]
+    df<-df[2:nrow(df),]
+    DT::datatable(df,options = list(paging = FALSE) )
     
-    # render only if there is data available
+  })
+  
+  
+  
+
+# Run batch event ---------------------------------------------------------
+  
+  observeEvent(input$run_batch, {
+    
+    
+    
     req(input_file())
     
-    # reactives are only callable inside an reactive context like render
-    data <- input_file()
-    data <- subset(data, dateCreated >= input$period[1] & dateCreated <= input$period[2])
+    #Transform data
+    df<-input_file()
+   
+    results<-data.frame(id=1:200)
+    #Loop over scenarios
+    for (ii in 1:nrow(df)){
+     
+    parameters<-df[ii,]
+    perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
+    qol_loss_LE<-get_QALY_tab(parameters,qaly_input)
+    res<-get_icer_obj(parameters,perisk,model,qol_loss_LE$agetab$dQALY)
     
-    data
+    obj<-res$bcea_tb
+    
+    
+    icername <- as.name(paste("ICER_",parameters$Scenario,sep=""))
+    costname <- as.name(paste("margin.cost_",parameters$Scenario,sep=""))
+    qalyname<- as.name(paste("margin.qaly_",parameters$Scenario,sep=""))
+    
+    results[[icername]]<- obj$delta_c/obj$delta_e
+    results[[costname]]<- obj$delta_c
+    results[[qalyname]]<- obj$delta_e
+    
+    
+    }
+
+    myReactives$batch_results<-results
+    
+  })
+  
+  observeEvent(input$run_batch, {
+    withProgressWaitress({
+      for (i in 1:15) {
+        incProgressWaitress(1)
+        Sys.sleep(0.25)
+      }
+    }, selector = "#run_batch", max = 15, theme = "overlay-percent")
+  })
+  
+  output$batch__results <- DT::renderDataTable({
+    df<-data.frame(myReactives$batch)
+    DT::datatable(df,options = list(paging = FALSE) )
+    
   })
   
   
   
   
   # EXtra plots -------------------------------------------------------------
-  
-  # Epi plots ----------------------------------------------------------
+
   
   
   output$plot_inc <- renderPlot({
