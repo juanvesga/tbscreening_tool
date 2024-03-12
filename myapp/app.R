@@ -28,8 +28,8 @@ library(matrixStats)
 library(waiter)
 
 
-# path_app<-rstudioapi::getSourceEditorContext()$path
-#  setwd(gsub('/app.R','', path_app))
+#path_app<-rstudioapi::getSourceEditorContext()$path
+#setwd(gsub('/app.R','', path_app))
 
 
 # Load necessary input ----------------------------------------------------
@@ -39,6 +39,7 @@ source("utils.R")
 source("get_periskope_dataset.R")
 source("get_QALY_tab.R")
 source("get_icer_obj.R")
+source("get_icer_obj_sa.R")
 
 
 # Load required objects into working directory
@@ -94,6 +95,8 @@ age.categorical <- Categorical(rownames(age_uk), p = age_uk/100)
 # Template for batch runs
 
 batch_temp <- read.csv("template.csv")
+
+dictionary <- read.csv("dictionary.csv")
 
 
 # UI  Menu---------------------------------------------------------------------
@@ -521,7 +524,7 @@ ui <- dashboardPage(
                                    
                                    fluidRow(  
                                      box(width = 4,
-                                         h3("Unit Cost of completed TPT regimen (£)"),
+                                         h3("Unit Cost of TPT regimen drugs(£)"),
                                          plotOutput("cost_tpt", height = "35vh")
                                      ),
                                      box(width = 4,
@@ -545,6 +548,36 @@ ui <- dashboardPage(
                                          )
                                      )
                                    ),
+                                   # Other costs
+                                   fluidRow(  
+                                     box(width = 4,
+                                         h3("Other TPT realted costs(£)"),
+                                         h5("This includes lab tests, staff time and others"),
+                                         plotOutput("cost_tpt2", height = "35vh")
+                                     ),
+                                     box(width = 4,
+                                         title="Select distribution to be used",
+                                         column(4,
+                                                radioButtons("tpt2cost_dist", "", c("Gamma","PERT")),
+                                         ),
+                                         column(4,
+                                                conditionalPanel(
+                                                  condition = "input.tpt2cost_dist == 'PERT'",
+                                                  numericInput("cost_tpt2_pert", "Most likely", value = 1000, min = 0, max = Inf),
+                                                  numericInput("cost_tpt2min_pert", "Min", value = 800, min = 0, max = Inf),
+                                                  numericInput("cost_tpt2max_pert", "Max", value = 1200, min = 0, max = Inf),
+                                                  sliderInput("cost_tpt2lam", "Shape", value = 4, min = 0, max = 10)
+                                                ),
+                                                conditionalPanel(
+                                                  condition = "input.tpt2cost_dist == 'Gamma'",
+                                                  numericInput("cost_tpt2_gamma", "Mean", value = 1000, min = 0, max = Inf),
+                                                  numericInput("cost_tpt2sd_gamma", "SD", value = 200, min = 0, max = Inf)
+                                                ),
+                                         )
+                                     )
+                                   ),
+                                   
+                                   
                                    # LTFUP cost
                                    fluidRow(  
                                      box(
@@ -558,6 +591,10 @@ ui <- dashboardPage(
                                      ),
                                    ),
                           ),
+                          
+                          
+                          
+                          
                           # cost TB Tx
                           tabPanel("TB treatment",
                                    
@@ -930,6 +967,87 @@ ui <- dashboardPage(
                                    
                                    
                           ),
+                          
+                          # Sensitivity analysis
+                          tabPanel("Sensitivity analysis",
+                                   fluidRow(
+                                     sidebarPanel(
+                                       fluidRow(
+                                         column(5, 
+                                       h4("Step 1: explore a range"),
+                                       br(),
+                                       selectInput("variable_sa", "Variable:",
+                                                   c("Test cost(£)" = "ltbi_c",
+                                                     "TPT cost(£)" = "tpt_c")),
+                                         ),
+                                       column(4,
+                                              h4("Tick to run fast exploration"),
+                                              checkboxInput("fast_sa", "Fast run", FALSE),
+                                       ),
+                                       ),
+                                       br(),
+                                       p("Select a range of values for sampling 
+                                         and number of points within the range"),
+                                       br(),
+                                       fluidRow(
+                                         column(width=3,
+                                                numericInput(inputId ="min_sa", label="Min", 
+                                                             value = 0, min = 0, max = Inf)),
+                                         column(width=3,
+                                                numericInput(inputId ="max_sa", label="Max", 
+                                                             value = 0, min = 0, max = Inf)),
+                                         column(width=3,
+                                                numericInput(inputId ="n_sa", label="N points", 
+                                                             value = 0, min = 0, max = 1000)),
+                                       ),
+                                       useWaitress(),
+                                       actionButton("run_sa","Run"),
+                                       
+                                       #styles
+                                       tags$head(
+                                         tags$style(" #run_sa{vertical-align:middle;
+                                                    background:firebrick;
+                                                    border-color:firebrick;
+                                                    color: white;}")),
+                                       
+                                     ),
+                                     
+                                     mainPanel(
+                                       br(),
+                                       plotOutput("plot_sa",width = "55%"),
+                                       
+                                     )
+                                   ),
+                                   fluidRow(
+                                     sidebarPanel(
+                                       h4("Step 2: Input a fixed parameter value and run full simulation"),
+                                       br(),
+                                       fluidRow(
+                                                numericInput(inputId ="mean_sa", label="Selected", 
+                                                             value = 0, min = 0, max = Inf)
+                                       ),
+                                       
+                                       actionButton("run_sa2","Run"),
+                                       
+                                       #styles
+                                       tags$head(
+                                         tags$style(" #run_sa2{vertical-align:middle;
+                                                    background:firebrick;
+                                                    border-color:firebrick;
+                                                    color: white;}")),
+                                       
+                                     ),
+                                     
+                                     mainPanel(
+                                       
+                                       plotOutput("plot_sa2",width = "85%"),
+                                       
+                                     )
+                                   ),
+                                   
+                                   
+                          ),
+                          
                           # Table parameters
                           tabPanel("Model parameters",
                                    fluidRow(
@@ -1002,33 +1120,33 @@ ui <- dashboardPage(
                                      fluidRow(
                                        column(
                                          width = 8,
-                                         tags$h4('1) Download the batch run template '),
+                                         tags$h5('1) Download the batch run template '),
                                          br(),
-                                         tags$h4('2) Download the parameter dictionary'),
+                                         tags$h5('2) Download the parameter dictionary'),
                                          br(),
-                                         tags$h4('3) Fill the template by adding new 
+                                         tags$h5('3) Fill the template by adding new 
                                                columns to the template, making sure 
                                                to name each column appropriately*'),
                                          br(),
-                                         tags$h4('4) Upload your batch file'),
+                                         tags$h5('4) Upload your batch file'),
                                          
                                          br(),
                                          br(),
-                                         tags$h4('5) Run the analysis on all
+                                         tags$h5('5) Run the analysis on all
                                                the scenarios uploaded'),
                                          
                                          br(),
                                          br(),
-                                         tags$h4('6) Download results as .csv'),
+                                         tags$h5('6) Download results as .csv'),
                                          
                                        ),
                                        column(
-                                         width = 3,
+                                         width = 4,
                                          downloadButton("down_temp", "Download", class="butt"),
                                          br(),
                                          br(),
-                                         downloadButton("down_dict", "Download", class="butt"),
                                          br(),
+                                         downloadButton("down_dict", "Download", class="butt"),
                                          br(),
                                          br(),
                                          br(),
@@ -1046,23 +1164,23 @@ ui <- dashboardPage(
                                          # Styles
                                          tags$head(
                                            tags$style(".butt{vertical-align:middle;
-                                                    height: 40px;
-                                                    width: 120%;
-                                                    font-size: 13px;
+                                                    height: 30px;
+                                                    width: 110%;
+                                                    font-size: 11px;
                                                     background:darkslategrey;
                                                     border-color:darkslategrey;
                                                     color: white;}
                                                     
                                                     .runbutt{vertical-align:middle;
-                                                    height: 40px;
-                                                    width: 120%;
-                                                    font-size: 13px; 
+                                                    height: 30px;
+                                                    width: 110%;
+                                                    font-size: 11px; 
                                                     background:firebrick;
                                                     border-color:firebrick;
                                                     color: white;}
                                                     
                                                     .btn-file{vertical-align:middle;
-                                                    font-size: 13px;
+                                                    font-size: 11px;
                                                     background:darkslategrey;
                                                     border-color:darkslategrey;
                                                     color: white;}")),
@@ -1099,7 +1217,7 @@ ui <- dashboardPage(
                           tabPanel("Summary",
                                    
                                    fluidPage(
-                                     DT::dataTableOutput("batch__results"),
+                                     DT::dataTableOutput("batch_results_tab"),
                                      style = "height:600px; overflow-y: scroll;overflow-x: scroll;"
                                    ) 
                                    
@@ -1116,30 +1234,34 @@ ui <- dashboardPage(
       # UI About ----------------------------------------------------
       tabItem(tabName = "about",
               fluidPage(
-                p("TB infection testing cost-effectiveness calculator",style = "font-size:25px"),
-                p("This tool was created to help quantify and visualise the 
-                  potential impact of performing TB infection tests, and providing
-                  TB preventive regimens among new entrants in the UK or contacts of TB cases.",
+                p("TB infection testing cost-effectiveness calculator",
+                  style = "font-size:25px"),
+                p("This tool was created to help quantify and visualise the
+                potential impact of performing TB infection tests, and providing 
+                TB preventive regimens among new entrants in the UK or contacts
+                  of TB cases.",
                   style = "text-align: justify; font-size:18px"),
-                p("The user is prompted to input information on demographic characteristics
-                  of the cohort, type of TB infection test, and the time
-                  horizon of analisis. With this informmation, the tool is able 
-                  to retrieve estimations of expected TB disease cases, 
-                  cost projections of the testing and TB prevention teratment  
-                  intervention, and importantly, a full set of cost-effectiveness 
-                  analysis (CEA) output.",style = "text-align: justify; font-size:18px"),
+                p("The user is prompted to input information on demographic 
+                  characteristics of the cohort, type of TB infection test, 
+                  and the time horizon of analysis. With this information, 
+                  the tool is able to retrieve estimations of expected TB 
+                  disease cases, cost projections of the testing and TB 
+                  prevention treatment intervention, and importantly, 
+                  a full set of cost-effectiveness analysis (CEA) output.",
+                  style = "text-align: justify; font-size:18px"),
                 
                 p("About this tool",style = "font-size:25px"),
                 
-                p("This tool builds on a previosuly developed personalised risk 
-                  predictor for incident TB", 
+                p("This tool builds on a previously developed personalised risk 
+                  predictor for incident TB ", 
                   span(tags$a(href="http://www.periskope.org/", 
                               "PERISKOPE-TB"),style = "color:blue"),
-                  ". At the core of PERISKOPE is a flexible parametric survival model 
-                  designed for estimating TB risk at the individual level. We 
-                  exploit this engine to recreate population-level estimations 
-                  of TB incidence. We build the health economics assesment on top of this 
-                  estimations, using the input provided by the user trhough the interface",
+                  ".At the core of PERISKOPE is a flexible parametric survival 
+                  model designed for estimating TB risk at the individual level.
+                  We exploit this engine to recreate population-level 
+                  estimations of TB incidence. We build the health economics 
+                  assessment on top of this estimations, using the input 
+                  provided by the user through the interface",
                   style = "text-align: justify; font-size:18px"),
                 
                 p("For further details on the methods behind PERISKOPE-TB, please consult 
@@ -1642,6 +1764,36 @@ server <- function(input, output,session) {
   })
   
   
+  output$cost_tpt2<- renderPlot({
+    
+    
+    n<-input$n
+    
+    if (input$tpt2cost_dist =="Gamma"){
+      xmean<-input$cost_tpt2_gamma
+      sd<- input$cost_tpt2sd_gamma 
+      shape<- (xmean^2)/(sd^2)
+      x  <- rgamma(n,shape=shape, rate=shape/xmean)
+      
+    } else if (input$tpt2cost_dist =="PERT"){
+      
+      xmean<-input$cost_tpt2_pert
+      xmin<-input$cost_tpt2min_pert
+      xmax<-input$cost_tpt2max_pert
+      lam<- input$cost_tpt2lam
+      x<-rpert(n,xmin,xmax,xmean,lam)
+    }
+    hist(x,
+         20,
+         main = " ",
+         xlab = "£",
+         col = "gold2")
+    
+  })
+  
+  
+  
+  
   output$cost_ltfup_tpt<- renderPlot({
     
     
@@ -1875,7 +2027,6 @@ server <- function(input, output,session) {
       tpt_cov=input$casc1/100,
       tpt_compl=input$casc2/100,
       tpt_cost_lfup=input$cost_ltfup/100,
-      dr=input$disc_rate/100,
       tst_attr=input$tst_attr/100,
       campcost_dist=input$campcost_dist, 
       cost_camp_gamma=input$cost_camp_gamma,
@@ -1969,6 +2120,104 @@ server <- function(input, output,session) {
     
   })
   
+  
+  icer_object_sa1 <- eventReactive(input$run_sa,{
+    
+    #Call necessary objects
+    
+    
+    params<-pars()
+    n<-input$n_sa
+
+    samps<-200
+    if (input$fast_sa==1){
+      samps<-10
+    }
+
+    sim_range= seq(input$min_sa,input$max_sa,length.out=n)
+    at20k= seq(input$min_sa,input$max_sa,length.out=n)*0
+    at30k= seq(input$min_sa,input$max_sa,length.out=n)*0
+    
+ 
+    withProgressWaitress({
+      
+
+    
+    for (ii in 1:n){
+      incProgressWaitress(1)
+    
+    if (input$variable_sa=="ltbi_c"){
+      
+      params$testcost_dist<-"Gamma"
+      params$cost_test_gamma<-sim_range[ii]
+      params$cost_testsd_gamma <-1
+      
+    }else if(input$variable_sa=="tpt_c"){
+      
+      params$tptcost_dist <-"Gamma"
+      params$cost_tpt_gamma <-sim_range[ii]
+      params$cost_tptsd_gamma <-1
+      
+    }
+    
+    perisk<-get_periskope_dataset(params,prevalence_tab$data,age.categorical)
+    
+    qol_loss_LE<- QoLmodel()$agetab$dQALY
+    
+ 
+  
+    obj<-get_icer_obj(params,perisk,model,qol_loss_LE,samps)
+
+    
+    bceares<- obj$bcea_tb
+    icers<- bceares$delta_c/bceares$delta_e
+    at20k[ii]<-length(which(icers<20000))/dim(icers)[1] 
+    at30k[ii]<-length(which(icers<30000))/dim(icers)[1]
+    
+    }
+    }, selector = "#run_sa", max = n, theme = "overlay-percent")
+    
+
+    out<-list(
+      at20k=at20k, 
+      at30k=at30k
+    )
+    
+    
+  })
+  
+  
+  icer_object_sa2 <- eventReactive(input$run_sa2,{
+    
+    #Call necessary objects
+    
+    
+    params<-pars()
+    
+
+      if (input$variable_sa=="ltbi_c"){
+        
+        params$testcost_dist<-"Gamma"
+        params$cost_test_gamma<-input$mean_sa
+        params$cost_testsd_gamma <-1
+        
+      }else if(input$variable_sa=="tpt_c"){
+        
+        params$tptcost_dist <-"Gamma"
+        params$cost_tpt_gamma <-input$mean_sa
+        params$cost_tptsd_gamma <-1
+        
+      }
+      
+      perisk<-get_periskope_dataset(params,prevalence_tab$data,age.categorical)
+      
+      qol_loss_LE<- QoLmodel()$agetab$dQALY
+      
+      get_icer_obj(params,perisk,model,qol_loss_LE)
+      
+    
+    
+  })
   
   
   # ICER plane --------------------------------------------------------------
@@ -2316,11 +2565,142 @@ server <- function(input, output,session) {
   
   
   
+  # Sensitivity analysis step 1 ---------------------------------------------------
+  
+  observeEvent(input$run_sa, {
+    
+    output$plot_sa<-renderPlot({
+      
+      obj<-icer_object_sa1()
+      n<-input$n_sa
+      df<-data.frame(
+        QALY20k=obj$at20k,
+        QALY30k=obj$at30k,
+        cost= seq(input$min_sa,input$max_sa,length.out=n)
+      )
+      
+      dfm<-reshape2::melt(df, id="cost")
+      
+      p<-ggplot(dfm,aes(x=cost,y=value,colour=variable))+
+        geom_line(size=1.3)+
+        geom_hline(yintercept=0.9,linetype=2, color="#9999CC")+
+        geom_hline(yintercept=0.5,linetype=2, color="#CC6666")+
+        ylab("Probability of cost-effectiveness")+
+        xlab("cost(£)")+
+        scale_color_manual(values=c("#CC6666", "#9999CC"))+
+        theme_minimal()+
+        theme(
+          legend.title =element_blank(),
+          text = element_text(size=20),
+          axis.text.x = element_text(angle=60, hjust=1))
+ 
+      gridExtra::grid.arrange(p) 
+      
+      
+      
+    },height = 350, width = 800 )
+    
+    
+    
+  })
+  
+  # Sensitivity analysis step 2 ---------------------------------------------------
+  observeEvent(input$run_sa2, {
+    
+    output$plot_sa2 <- renderPlot({
+      #req(input$will_to_pay)
+      obj<-icer_object_sa2()
+      bceares<- obj$bcea_tb
+      will_to_pay=input$will_to_pay
+      icercol<-"#FF3333"
+      
+      
+      #ICER plane  
+      p1 <- ceplane.plot(bceares,
+                         wtp =will_to_pay,
+                         graph="ggplot2",
+                         line = list(color = "grey40"),
+                         point = list(color = "blue"),
+                         icer = list(color = icercol, size = 3),
+                         area = list(fill = "lightcyan"),
+                         theme = theme_minimal())
+      
+      p1<-p1+ theme(
+        text = element_text(size=16),
+        axis.text.x = element_text(angle=60, hjust=1))
+      
+
+      
+      # INB
+      
+      df<-obj$INB
+      t<-input$t_hor
+      icer<-mean(obj$ICER[,t])
+      
+      
+      
+      p2 <- ggplot(data = df, aes(x = x)) +
+        geom_ribbon(aes(ymin = `2.5%`, ymax = `97.5%`), fill ='darkorange', alpha = 0.2) +
+        geom_line(aes(y = `50%`), col = 'darkorange', lwd = 1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 25, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 20, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 15, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 10, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        geom_point(data=data.frame(x=icer, y=0), 
+                   aes(x,y), 
+                   size = 5, 
+                   shape = 16, 
+                   color="red",
+                   alpha=0.1) +
+        annotate(geom="text", x=icer, y=1000, label="ICER",
+                 color="grey40")+
+        labs(
+          title = "Incremental Net Benefit Analysis"
+        )+
+        xlab("WTP (£/QALY)")+
+        ylab("Net Benefit (£)")+
+        theme_minimal()+
+        theme(
+          text = element_text(size=16),
+          axis.text.x = element_text(angle=60, hjust=1))
+      
+      gridExtra::grid.arrange(p1,p2,nrow=1) 
+      
+      
+      
+      
+      
+      
+    },height = 350 )
+  })
+  
   
   # Scenarios ---------------------------------------------------------------
   myReactives <- reactiveValues() 
   temp_tab<-reactive({df=data.frame(batch_temp)})
-  observe(  myReactives$template <-  temp_tab()) 
+  dict_tab<-reactive({df=data.frame(dictionary)})
+  observe(  myReactives$template <-  temp_tab())
+  observe(  myReactives$dictionary <-  dict_tab()) 
   
   observe(myReactives$batch <-  input_file()) 
   
@@ -2345,7 +2725,7 @@ server <- function(input, output,session) {
       },
       
       content = function(file) {
-        write.csv(par_tab(), file)
+        write.csv(myReactives$dictionary, file)
       }
     )
   
@@ -2356,7 +2736,9 @@ server <- function(input, output,session) {
       },
       
       content = function(file) {
-        write.csv(myReactives$batch_results, file)
+        
+        df<-data.frame(myReactives$batch_results)
+        write.csv(df, file)
       }
     )
   
@@ -2370,7 +2752,7 @@ server <- function(input, output,session) {
   
   
   # Errors: Batch file Warnings --------------------------------------------------------------
-
+  
   input_file <- reactive({
     if (is.null(input$batch_file)) {
       shinyjs::disable("run_batch")
@@ -2380,8 +2762,8 @@ server <- function(input, output,session) {
     {
       
       data<-read.csv(file = input$batch_file$datapath)
-  
-     
+      
+      
       if(ncol(data)<ncol(myReactives$template))
       {
         shinyalert("Error","Uploaded Data has less cols than required",type="error")
@@ -2472,56 +2854,61 @@ server <- function(input, output,session) {
   
   
   
-
-# Run batch event ---------------------------------------------------------
+  
+  # Run batch  ---------------------------------------------------------
   
   observeEvent(input$run_batch, {
     
     
+    shinyjs::disable("down_batch")
     
     req(input_file())
     
     #Transform data
     df<-input_file()
-   
+    
     results<-data.frame(id=1:200)
     #Loop over scenarios
-    for (ii in 1:nrow(df)){
-     
-    parameters<-df[ii,]
-    perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
-    qol_loss_LE<-get_QALY_tab(parameters,qaly_input)
-    res<-get_icer_obj(parameters,perisk,model,qol_loss_LE$agetab$dQALY)
+    withProgressWaitress({
+      for (ii in 1:nrow(df)){
+        incProgressWaitress(1)
+        
+        parameters<-df[ii,]
+        perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
+        qol_loss_LE<-get_QALY_tab(parameters,qaly_input)
+        res<-get_icer_obj(parameters,perisk,model,qol_loss_LE$agetab$dQALY)
+        
+        obj<-res$bcea_tb
+        
+        icername <- as.name(paste("ICER_",parameters$Scenario,sep=""))
+        costname <- as.name(paste("margin.cost_",parameters$Scenario,sep=""))
+        qalyname<- as.name(paste("margin.qaly_",parameters$Scenario,sep=""))
+        
+        results[[icername]]<- obj$delta_c$`No intervention`/obj$delta_e$`No intervention`
+        results[[costname]]<- obj$delta_c$`No intervention`
+        results[[qalyname]]<- obj$delta_e$`No intervention`
+        
+      }
+    }, selector = "#run_batch", max = nrow(df), theme = "overlay-percent")
     
-    obj<-res$bcea_tb
-    
-    
-    icername <- as.name(paste("ICER_",parameters$Scenario,sep=""))
-    costname <- as.name(paste("margin.cost_",parameters$Scenario,sep=""))
-    qalyname<- as.name(paste("margin.qaly_",parameters$Scenario,sep=""))
-    
-    results[[icername]]<- obj$delta_c/obj$delta_e
-    results[[costname]]<- obj$delta_c
-    results[[qalyname]]<- obj$delta_e
-    
-    
-    }
-
     myReactives$batch_results<-results
     
+    
+    shinyjs::enable("down_batch")
+    
   })
   
-  observeEvent(input$run_batch, {
-    withProgressWaitress({
-      for (i in 1:15) {
-        incProgressWaitress(1)
-        Sys.sleep(0.25)
-      }
-    }, selector = "#run_batch", max = 15, theme = "overlay-percent")
-  })
+  # observeEvent(input$run_batch, {
+  #   withProgressWaitress({
+  #     for (i in 1:15) {
+  #       incProgressWaitress(1)
+  #       Sys.sleep(0.25)
+  #     }
+  #   }, selector = "#run_batch", max = 15, theme = "overlay-percent")
+  # })
   
-  output$batch__results <- DT::renderDataTable({
-    df<-data.frame(myReactives$batch)
+  output$batch_results_tab <- DT::renderDataTable({
+    df<-myReactives$batch_results
     DT::datatable(df,options = list(paging = FALSE) )
     
   })
@@ -2530,7 +2917,7 @@ server <- function(input, output,session) {
   
   
   # EXtra plots -------------------------------------------------------------
-
+  
   
   
   output$plot_inc <- renderPlot({
