@@ -1,4 +1,4 @@
-get_icer_obj<-function(parameters, perisk, model, qol_LE, nsamp=200){
+get_icer_obj<-function(parameters, perisk, model, qol_LE, c_matrix, nsamp=200){
 
 
     base1<-perisk$df
@@ -13,7 +13,7 @@ get_icer_obj<-function(parameters, perisk, model, qol_LE, nsamp=200){
     tpt_compl<-parameters$tpt_compl
     tpt_cost_lfup<-parameters$tpt_cost_lfup
     dr<-parameters$dr
-
+    n_sec_cases<-  parameters$new_cases
 
     #CFR Crofts et al2008
     cfr <- c(0.012,0.012,0.048,0.176)
@@ -469,18 +469,33 @@ get_icer_obj<-function(parameters, perisk, model, qol_LE, nsamp=200){
         dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(., na.rm = TRUE)))
 
 
+
+    cases_itv<-unlist((sim_cases_age_itv[,time_horizon+1]))
+    sec_cases_itv<-(rowSums(t(c_matrix*cases_itv)))
     sim_cases_age<-sim_cases_age[,2:ncol(sim_cases_age)]
+
+    # Estimate and add secondary cases
+    cases<-unlist((sim_cases_age[,time_horizon]))
+    sec_cases<-(rowSums(t(c_matrix*cases))) * n_sec_cases
+    sim_cases_age[,time_horizon]<-sim_cases_age[,time_horizon]+sec_cases
+
     sim_cases_age_eptb<- round(sim_cases_age * frac_eptb)
     sim_cases_age_ptb <- sim_cases_age-sim_cases_age_eptb
 
-    #c<-mapply(binom_draw,sim_cases_age_ptb,exp_prob)
+
     sim_deaths <- sim_cases_age_ptb*cfr#matrix(c, nrow = nrow(sim_cases_age_ptb), ncol = ncol(logical_matrix))
 
 
     sim_cases_age_itv<-sim_cases_age_itv[,2:ncol(sim_cases_age_itv)]
+
+    # Estimate and add secondary cases
+    cases<-unlist((sim_cases_age_itv[,time_horizon]))
+    sec_cases<-(rowSums(t(c_matrix*cases_itv))) * n_sec_cases
+    sim_cases_age_itv[,time_horizon]<-sim_cases_age_itv[,time_horizon]+sec_cases
+
     sim_cases_age_eptb_itv<- round(sim_cases_age_itv * frac_eptb)
     sim_cases_age_ptb_itv <- sim_cases_age_itv-sim_cases_age_eptb_itv
-    #  c<-mapply(binom_draw,sim_cases_age_ptb_itv,exp_prob)
+
     sim_deaths_itv <- sim_cases_age_ptb_itv*cfr#matrix(c, nrow = nrow(sim_cases_age_ptb_itv), ncol = ncol(logical_matrix_itv))
 
 
