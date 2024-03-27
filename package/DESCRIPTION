@@ -1,0 +1,36 @@
+Package: package
+Type: Package
+Title: What the package does (short line)
+Version: 0.0.0.9000
+Authors@R:
+    person(
+        given = "Tim",
+        family = "Taylor",
+        role = c("aut", "cre", "cph"),
+        email = "tim.taylor@hiddenelephants.co.uk",
+        comment = c(ORCID = "0000-0002-8587-7113")
+    )
+Description: More about what it does (maybe more than one line)
+License: What license is it under?
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports: 
+    BCEA,
+    data.table,
+    distributions3,
+    dplyr,
+    DT,
+    freedom,
+    gridExtra,
+    Hmisc,
+    matrixStats,
+    reshape2,
+    rmarkdown,
+    rstpm2,
+    shiny,
+    shinydashboard,
+    shinyjs,
+    waiter
+Depends: 
+    R (>= 3.5)
