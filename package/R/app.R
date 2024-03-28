@@ -10,17 +10,18 @@
 #' @import BCEA
 #' @import shinyBS
 #' @import igraph
-#' @import socialmixr
 #'
 #' @export
 tool <- function(...) {
 
-    # internal data available on load:
-    #   model
-    #   country_tb_inc
-    #   qaly_input
-    #   batch_temp
-    #   dictionary
+    # The following objects are constructed in data-raw/DATASET.R and made
+    # available on load:
+    #     - model
+    #     - country_tb_inc
+    #     - qaly_input
+    #     - batch_temp
+    #     - dictionary
+    #     - c_matrix (contact matrix)
 
     tests <- c("QuantiFERON", "T-SPOT.TB", "Tuberculin Skin Test")
 
@@ -53,24 +54,6 @@ tool <- function(...) {
 
 
     # -------------------------------------------------------------------------
-    # TODO - build this contact matrix section as internal data
-
-    # Contact matrices for estimating secondary cases
-    ages   <-  c(15,35,45,65,85) # Upper end of age bands
-    age.categories <- as.factor(ages)
-    data(polymod, package = "socialmixr") # POLYMOD for all other contacts
-
-    contact = contact_matrix(
-        polymod, countries = "United Kingdom",
-        age.limits = c(0,as.numeric(as.character(age.categories[1:(length(ages)-1)]))),
-        symmetric = TRUE)
-
-    # normalised matrix
-    c_matrix<-contact$matrix[c(2:5),c(2:5)]/rowSums(contact$matrix[c(2:5),c(2:5)])
-    # -------------------------------------------------------------------------
-
-
-
     ui <- dashboardPage(
 
         skin = "black",

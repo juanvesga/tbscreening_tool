@@ -1,5 +1,6 @@
 library(dplyr)
 library(readxl)
+library(socialmixr)
 
 model <-
     load("data-raw/fit_final_github_2020-08-14") |>
@@ -21,6 +22,13 @@ batch_temp <- read.csv("data-raw/template.csv")
 
 dictionary <- read.csv("data-raw/dictionary.csv")
 
+# normalised contact matrices for estimating secondary cases
+contact = contact_matrix(
+    polymod, countries = "United Kingdom",
+    age.limits = c(0,15,35,45,65), # lower bounds
+    symmetric = TRUE)
+c_matrix<-contact$matrix[c(2:5),c(2:5)]/rowSums(contact$matrix[c(2:5),c(2:5)])
+
 usethis::use_data(
     # objects
     model,
@@ -28,6 +36,7 @@ usethis::use_data(
     qaly_input,
     batch_temp,
     dictionary,
+    c_matrix,
 
     # other arguments
     internal = TRUE,

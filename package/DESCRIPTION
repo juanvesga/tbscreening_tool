@@ -31,7 +31,6 @@ Imports:
     shiny,
     shinydashboard,
     shinyjs,
-    socialmixr,
     waiter
 Depends: 
     R (>= 3.5)
