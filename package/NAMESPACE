@@ -2,7 +2,6 @@
 
 export(tool)
 import(BCEA)
-import(DT)
 import(data.table)
 import(ggplot2)
 import(igraph)
@@ -10,5 +9,4 @@ import(rstpm2)
 import(shiny)
 import(shinyBS)
 import(shinydashboard)
-import(socialmixr)
 import(waiter)
