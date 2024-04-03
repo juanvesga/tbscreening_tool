@@ -2,7 +2,6 @@
 
 export(tool)
 import(BCEA)
-import(data.table)
 import(ggplot2)
 import(igraph)
 import(rstpm2)

@@ -1,131 +1,112 @@
-# TODO - This seems a little odd. Let's discuss further. TT
-# NOTE - Currently assumes data.table input. TT
-get_QALY_tab<-function(parameters, qaly_input) {
+get_QALY_tab <- function(r) {
 
-    q.male   <- qaly_input$q.male
-    q.female <- qaly_input$q.female
-    qol      <- qaly_input$qol
-    age_bands<- qaly_input$age_bands
-
-    country <- "UK"
+    # TODO - I believe these are parameters in the original code but we are
+    #        fixing them. If we are intending to keep them fixed then we can
+    #        probably simplify some of the stuff below. TT
     smr <- 1
     qcm <- 1
-    r <- parameters$dr
-    time_horizon<-120#parameters$time_horizon Seee full LE
+    time_horizon <- 120
 
+    # TODO - This validation probably wants shifting in to the UI part of the code. TT
     shiny::validate(
-        need(parameters$dr <=0.1, "Please choose a valid discount rate between 0% and 10%"),
-        need(parameters$dr >=0, "Please choose a valid discount rate between 0% and 10%"),
+        need(r <=0.1, "Please choose a valid discount rate between 0% and 10%"),
+        need(r >=0, "Please choose a valid discount rate between 0% and 10%"),
     )
 
-    myvector <- c("Age",country)
+    # pull out internal data frames
+    q.male   <- qaly_input2$q.male
+    q.female <- qaly_input2$q.female
+    qol      <- qaly_input2$qol
+    age_bands<- qaly_input2$age_bands
 
-    l_x_est <- function(dt, countr, smr){
-        ## dt = data table with q(x) vaues
-        ## country = selected country
-        ## smr = smr
-        myvector <- c("Age",countr)
-
-        y <- dt[, ..myvector]
-        colnames(y) <- c("x","q_x")
-
-        y[ , d_x := -log(1-y$q_x)]
-
-        y[ 1, l_x := 100000]
-
-        for (i in 2:nrow(y)){
-            y[i, l_x := y$l_x[[i-1]] *
-                  exp((-y$d_x[[i-1]])*smr)]
-        }
-        return(y)
+    # TODO - To me the following function is equivalent (save inclusion of
+    #        data frame as part of function) to commented out version below. I'm
+    #        not sure if there was a numerical reason to have the former or if
+    #        there was an error in the original implementation? TT
+    l_x_est <- function(qx, smr){
+        mult <- c(1, (1 - qx[-length(qx)])^smr)
+        100000 * cumprod(mult)
     }
+    # l_x_est <- function(dat, smr){
+    #     # dat = data frame with q(x) vaues
+    #     colnames(dat) <- c("x","qx")
+    #     dx <- -log(1 - dat$qx)
+    #     lx <- numeric(length(dx))
+    #     lx[1L] <- 100000
+    #     for (i in seq_along(lx)[-1L]) {
+    #         lx[i] <- lx[i - 1L] * exp(-dx[i - 1L] * smr)
+    #     }
+    # }
 
-    q.male <- l_x_est(q.male, country, smr)
-    q.female <- l_x_est(q.female, country, smr)
+    q.male <- dplyr::rename(q.male, q_male = UK)
+    q.male <- dplyr::mutate(q.male, l_male = l_x_est(q_male, smr))
 
-    q.person <- merge(q.male, q.female, by="x")
-    colnames(q.person) <- c("x","q_male","d_male","l_male",
-                            "q_female","d_female","l_female")
-    q.person[ , p.f := l_female/(l_female+l_male)]
-    q.person[ , l_person := (p.f*l_female)+
-                  ((1-p.f)*l_male)]
+    q.female <- dplyr::rename(q.female, q_female = UK)
+    q.female <- dplyr::mutate(q.female, l_female = l_x_est(q_female, smr))
 
-    for (i in 1:(nrow(q.person)-1)){
-        q.person[i, bigl_x := (q.person$l_person[[i]]+ q.person$l_person[[i+1]])/2]
-    }
+    # Note 1: The stats::filter function used below is the equivalent to the
+    #         following in data.table:
+    #             biglx <- frollmean(c(q.person,0),2,align="left")
+    #             q.person[, biglx := ..biglx[-length(..biglx)]]
+    #             q.person[, biglx := frollmean(c(q.person,0),2,align="left")
+    #
+    #         In the original code it was written as a for loop:
+    #             for (i in 1:(nrow(q.person)-1))
+    #                 q.person[i, bigl_x := (q.person$l_person[[i]]+ q.person$l_person[[i+1]])/2]
+    #
+    # Note 2: The t_x value is equivalent to the following loop from the
+    #         original code:
+    #                 for (i in 1:nrow(q.person))
+    #                     q.person[i, t_x := sum(q.person$bigl_x[i:nrow(q.person)])]
+    #
+    qale <- dplyr::left_join(q.male, q.female, by = "Age")
 
-    q.person[nrow(q.person), bigl_x := (q.person$l_person[[nrow(q.person)]])/2]
+    qale <- dplyr::mutate(
+        qale,
+        p.f = l_female / (l_female + l_male),
+        l_person = (p.f * l_female) + ((1 - p.f) * l_male),
+        bigl_x = stats::filter(c(l_person, 0), rep(0.5, 2), sides = 1)[-1L],
+        t_x = rev(cumsum(rev(bigl_x))),
+        LE_x = t_x / l_person
+    )
 
-    for (i in 1:nrow(q.person)){
-        q.person[i, t_x := sum(q.person$bigl_x[i:nrow(q.person)])]
-    }
+    qale <- dplyr::left_join(
+        dplyr::select(qale, Age, l_person, bigl_x, t_x, LE_x),
+        dplyr::select(qol, Age, qol_age = UK),
+        by = "Age"
+    )
 
-    q.person[ , LE_x := t_x/l_person]
+    qale <- dplyr::mutate(
+        qale,
+        z_x = bigl_x * qol_age * qcm,
+        t_adj = rev(cumsum(rev(z_x))),
+        qale_x = t_adj / l_person
+    )
 
-    ########### calculating QALE ########
-    myvector.qol <- c("low","high",country)
-
-    dt.qol <- qol[, ..myvector.qol]
-    colnames(dt.qol) <- c("low","high","qol_age")
-
-
-    qale <- q.person[dt.qol, on = .(x >= low, x <= high), nomatch = 0,
-                     .(x.x, l_person, bigl_x, t_x, LE_x,qol_age)]
-
-    qale[ , z_x := bigl_x*qol_age*qcm]
-
-    for (i in 1:nrow(qale)){
-        qale[i , t_adj := sum(qale$z_x[i:nrow(qale)])]
-    }
-
-    qale[ , qale_x := t_adj/l_person]
-
-    qaly.calc <- qale[ , c("x.x","z_x")]
-
-    temp.q <- list()
-    for (i in 1:nrow(qaly.calc)){
-        temp.q[[i]] <- qaly.calc[i:nrow(qaly.calc),]
-    }
-
+    qaly.calc <- qale[c("Age","z_x")]
+    nr <- nrow(qaly.calc)
+    temp.q <- lapply(seq_len(nr), function(i) qaly.calc[i:nr, ])
     temp.q <- dplyr::bind_rows(temp.q, .id = "column_label")
-    temp.q %>% setDT() ## creating a copy as otherwise there is a warning
-    ## message (still runs but just for "clean" code), so this stops attempts of .internal.selfref detected
-    temp.q_copy <- copy(temp.q)
-    temp.q_copy[ , column_label := as.numeric(column_label)-1]
+    temp.q <- dplyr::mutate(
+        temp.q,
+        column_label = as.numeric(column_label) - 1,
+        b_x = z_x / (1 + r) ^ (Age - column_label),
+        index = as.integer(Age <= time_horizon)
+    )
 
-    temp.q_copy[ , b_x := z_x/((1+r))^(x.x-(column_label))] ## n.b x.x = u and column_label = x in the corresponding formulae in the CodeBook
+    total.b <- dplyr::summarise(
+        temp.q,
+        bigb_x = sum(b_x),
+        bigb_xfoo = sum(b_x[index == 1L]),
+        .by = column_label
+    )
 
+    cov <- dplyr::left_join(qale, total.b, by = join_by(Age == column_label))
+    cov <- dplyr::mutate(cov, dQALY = bigb_xfoo / l_person)
+    age_bands <- dplyr::mutate(age_bands, midpoint = ceiling( (low + high) / 2))
+    cov <- dplyr::inner_join(cov, age_bands, by = join_by(Age == midpoint))
+    cov <- dplyr::select(cov, "Age Group" = "Age band", LE = LE_x, QALE = qale_x, dQALY)
 
-    temp.q_copy<-temp.q_copy %>%
-        dplyr::mutate(index=1*(x.x<=time_horizon))
-
-
-    total.b <- temp.q_copy[ , .(bigb_x = sum(b_x),
-                                bigb_xfoo = sum(b_x[index==1])),
-                            by = column_label]
-
-
-    #total.b <- temp.q_copy[,.(bigb_x=sum(b_x)), by=column_label]
-
-    colnames(total.b) <- c("x.x","bigb_x","bigb_xfoo")
-    qale <- merge(qale, total.b, by="x.x")
-
-    qale[ , dQALY := bigb_xfoo/l_person]
-
-    ######### calculating covid19 loss #######
-
-
-    age_bands[ , midpoint := ceiling((low+high)/2)]
-
-    cov <- merge(qale, age_bands, by.x="x.x", by.y="midpoint", all=FALSE)
-
-    ### ADDING AGE GROUP BREAKDOWN TABLE
-    cov[,"Age Group":=paste(cov[,low],cov[,high],sep="-")]
-    setnames(cov, old=c("LE_x","qale_x","dQALY"),
-             new=c("LE","QALE","dQALY"))
-
-    agetab <- cov[ , c("Age Group",
-                       "LE","QALE","dQALY")]
-
-    return(list( agetab=agetab))
+    list(agetab = cov)
 }
+

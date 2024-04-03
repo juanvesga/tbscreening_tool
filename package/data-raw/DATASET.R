@@ -17,6 +17,16 @@ qaly_input<-list(
     covid.age = as.data.frame(read_xlsx("data-raw/inputs.xlsx", 4)),
     age_bands= as.data.frame(read_xlsx("data-raw/inputs.xlsx", 5))
 )
+qaly_input$q.male <- qaly_input$q.male[1:2]
+qaly_input$q.female <- qaly_input$q.female[1:2]
+dat <- qaly_input$qol[1:4]
+times <- with(dat, high - low + 1L)
+index <- rep(1:nrow(dat), times)
+dat <- dat[index,]
+dat$Age <- 1:nrow(dat) - 1L
+rownames(dat) <- NULL
+qaly_input$qol <- dat
+qaly_input$covid.age <- NULL
 
 batch_temp <- read.csv("data-raw/template.csv")
 

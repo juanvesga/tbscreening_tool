@@ -3,7 +3,6 @@
 #' @import shiny
 #' @import shinydashboard
 #' @import waiter
-#' @import data.table
 #' @import ggplot2
 #' @import rstpm2
 #' @import BCEA
@@ -41,8 +40,6 @@ tool <- function(...) {
         "46-65" = 35,
         "65+"   = 45
     ))
-
-    qaly_input <- lapply(qaly_input, setDT)
 
     qol_full <- as.matrix(c(
         "A_16to35" = 0.94,
@@ -1857,7 +1854,7 @@ tool <- function(...) {
 
         QoLmodel <- eventReactive(xxchange(), {
             parameters<-pars()
-            get_QALY_tab(parameters,qaly_input)
+            get_QALY_tab(parameters$dr)
 
         })
 
@@ -2621,7 +2618,7 @@ tool <- function(...) {
 
                     parameters<-df[ii,]
                     perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
-                    qol_loss_LE<-get_QALY_tab(parameters,qaly_input)
+                    qol_loss_LE<-get_QALY_tab(parameters$dr)
                     res<-get_icer_obj(parameters,perisk,model,qol_loss_LE$agetab$dQALY,c_matrix)
 
                     obj<-res$bcea_tb
