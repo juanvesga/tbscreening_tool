@@ -101,10 +101,10 @@ get_QALY_tab <- function(r) {
         .by = column_label
     )
 
-    cov <- dplyr::left_join(qale, total.b, by = join_by(Age == column_label))
+    cov <- dplyr::left_join(qale, total.b, by = dplyr::join_by(Age == column_label))
     cov <- dplyr::mutate(cov, dQALY = bigb_xfoo / l_person)
     age_bands <- dplyr::mutate(age_bands, midpoint = ceiling( (low + high) / 2))
-    cov <- dplyr::inner_join(cov, age_bands, by = join_by(Age == midpoint))
+    cov <- dplyr::inner_join(cov, age_bands, by = dplyr::join_by(Age == midpoint))
     cov <- dplyr::select(cov, "Age Group" = "Age band", LE = LE_x, QALE = qale_x, dQALY)
 
     list(agetab = cov)
