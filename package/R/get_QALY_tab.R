@@ -14,10 +14,10 @@ get_QALY_tab <- function(r) {
     )
 
     # pull out internal data frames
-    q.male   <- qaly_input2$q.male
-    q.female <- qaly_input2$q.female
-    qol      <- qaly_input2$qol
-    age_bands<- qaly_input2$age_bands
+    q.male   <- qaly_input$q.male
+    q.female <- qaly_input$q.female
+    qol      <- qaly_input$qol
+    age_bands<- qaly_input$age_bands
 
     # TODO - To me the following function is equivalent (save inclusion of
     #        data frame as part of function) to commented out version below. I'm
