@@ -32,8 +32,6 @@ tool <- function(...) {
         "65+"   = 22
     ))
 
-    age.categorical <- distributions3::Categorical(rownames(age_uk), p = age_uk/100)
-
     prev_uk <- as.matrix(c(
         "16-35" = 10,
         "36-45" = 25,
@@ -1865,7 +1863,7 @@ tool <- function(...) {
 
             #Call necessary objects
             parameters<-pars()
-            perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
+            perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age_uk)
 
             qol_loss_LE<- QoLmodel()$agetab$dQALY
             get_icer_obj(parameters,perisk,model,qol_loss_LE, c_matrix)
@@ -1912,7 +1910,7 @@ tool <- function(...) {
                       params$new_cases <-sim_range[ii]
                     }
 
-                    perisk<-get_periskope_dataset(params,prevalence_tab$data,age.categorical)
+                    perisk<-get_periskope_dataset(params,prevalence_tab$data,age_uk)
 
                     qol_loss_LE<- QoLmodel()$agetab$dQALY
 
@@ -1954,7 +1952,7 @@ tool <- function(...) {
 
             }
 
-            perisk<-get_periskope_dataset(params,prevalence_tab$data,age.categorical)
+            perisk<-get_periskope_dataset(params,prevalence_tab$data,age_uk)
 
             qol_loss_LE<- QoLmodel()$agetab$dQALY
 
@@ -2617,7 +2615,7 @@ tool <- function(...) {
                     incProgressWaitress(1)
 
                     parameters<-df[ii,]
-                    perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
+                    perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age_uk)
                     qol_loss_LE<-get_QALY_tab(parameters$dr)
                     res<-get_icer_obj(parameters,perisk,model,qol_loss_LE$agetab$dQALY,c_matrix)
 
