@@ -2114,8 +2114,8 @@ tool <- function(...) {
             output$plot_INB <- renderPlot({
                 # req(input$will_to_pay)
                 df<-icer_object()$INB
-                t<-input$t_hor
-                icer<-mean(icer_object()$ICER[,t])
+                icer<-mean(icer_object()$ICER)
+                browser()
 
 
 
@@ -2376,7 +2376,7 @@ tool <- function(...) {
 
                 df<-obj$INB
                 t<-input$t_hor
-                icer<-mean(obj$ICER[,t])
+                icer<-mean(obj$ICER)
 
 
 
