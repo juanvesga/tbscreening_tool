@@ -30,6 +30,7 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
         base1$result[index[seq_len(apos)]] <- "Positive"
         na[[i]] <- index
     }
+    npositives <- length(which(base1$result=="Positive"))
 
     # Results
     base1$pct_qfn      <- NA
@@ -120,6 +121,6 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
 
     list(
         df = base1,
-        npositives = length(which(base1$result=="Positive"))
+        npositives = npositives
     )
 }

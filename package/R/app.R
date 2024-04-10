@@ -2115,9 +2115,6 @@ tool <- function(...) {
                 # req(input$will_to_pay)
                 df<-icer_object()$INB
                 icer<-mean(icer_object()$ICER)
-                browser()
-
-
 
                 p <- ggplot(data = df, aes(x = x)) +
                     geom_ribbon(aes(ymin = `2.5%`, ymax = `97.5%`), fill ='darkorange', alpha = 0.2) +
