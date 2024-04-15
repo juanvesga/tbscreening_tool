@@ -25,109 +25,76 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
         "46-65" = 56L,
         "65+"   = 83L
     )
-    stopifnot(identical(rownames(age.categorical), names(lookage)))
 
-    base1        <- list2DF(list(Age_cat = samps_age, Age = lookage[samps_age]))
-
-    base1$result <- "Negative"
-    na           <- vector("list", length(age_cats))
+    age <- lookage[samps_age]
+    result <- rep("Negative", times = cohort_size)
+    na <- vector("list", length(age_cats))
     for (i in seq_along(age_cats)) {
-        index <- which(base1$Age_cat == age_cats[i])
-        apos <- round(length(index) * prev[i])
-        base1$result[index[seq_len(apos)]] <- "Positive"
+        index <- samps_age == age_cats[[i]]
+        apos <- round(sum(index) * prev[[i]])
+        result[index][seq_len(apos)] <- "Positive"
         na[[i]] <- index
     }
-    npositives <- length(which(base1$result=="Positive"))
+    npositives <- sum(result == "Positive")
 
     # Results
-    base1$pct_qfn      <- NA
-    base1$pct_tspot    <- NA
-    base1$pct_tst      <- NA
-    base1$qfn_result   <- NA
-    base1$tspot_result <- NA
-    base1$tst_result   <- NA
-
     if(test == "QuantiFERON") {
-        base1$qfn_result <- base1$result
+        qfn_result <- result
+        tspot_result <- rep(NA_character_, times = cohort_size)
     } else if (test == "T-SPOT.TB") {
-        base1$tspot_result <- base1$result
-    } else {
-        base1$tst_result <- base1$result
+        tspot_result <- result
+        qfn_result <- rep(NA_character_, times = cohort_size)
     }
 
     # Impute result from qualitative result
-    base1 <- mutate(
-        base1,
-        pct_testspl1 = case_when(
-            !is.na(pct_qfn)                       ~ as.integer(pct_qfn),
-            !is.na(pct_tspot)                     ~ as.integer(pct_tspot),
-            qfn_result == "Positive"              ~ 87L,
-            qfn_result == "Negative"              ~ 1L,
-            tspot_result == "Positive"            ~ 87L,
-            tspot_result == "Borderline positive" ~ 79L,
-            tspot_result == "Borderline negative" ~ 76L,
-            tspot_result == "Negative"            ~ 1L,
-            !is.na(pct_tst)                       ~ as.integer(pct_tst)
-        )
+    pct_testspl1 <- case_when(
+        qfn_result == "Positive"              ~ 87L,
+        qfn_result == "Negative"              ~ 1L,
+        tspot_result == "Positive"            ~ 87L,
+        tspot_result == "Negative"            ~ 1L
     )
 
     ### Add test result splines (5 knots at fixed positions)
     pct_test_spline5 <- as.data.frame(
-        Hmisc::rcspline.eval(
-            base1$pct_testspl1,
-            knots = c(5, 27.5, 50, 72.5, 95)
-        )
+        Hmisc::rcspline.eval(pct_testspl1, knots = c(5, 27.5, 50, 72.5, 95))
     )
     colnames(pct_test_spline5) <- c("pct_testspl2", "pct_testspl3", "pct_testspl4")
-    base1 <- cbind(base1,pct_test_spline5)
 
     ## Age splines (5 knots at fixed positions)
-    base1       <- rename(base1, agespl1 = Age)
     age_spline5 <- as.data.frame(
-        Hmisc::rcspline.eval(
-            base1$agespl1,
-            knots = c(8, 25, 33.07, 45, 64)
-        )
+        Hmisc::rcspline.eval(age, knots = c(8, 25, 33.07, 45, 64))
     )
     colnames(age_spline5) <- c("agespl2", "agespl3", "agespl4")
-    base1 <- cbind(base1, age_spline5)
 
     # Status
-    base1$contact             <- if (cohort_type=="contact") "Yes" else "No"
-    base1$indexcase_proximity <- if (cohort_type == "contact") contact_type else "Not applicable"
-    base1$migrant             <- if (cohort_type=="new") "Yes" else "No"
+    contact <- if (cohort_type=="contact") "Yes" else "No"
+    indexcase_proximity <- if (cohort_type == "contact") contact_type else "Not applicable"
+    migrant <- if (cohort_type == "new") "Yes" else "No"
 
     # Exposure category
-    if(cohort_type=="contact"&& contact_type=="household"){
-        base1$exposure_cat4b <- "Household, smear+"
-    } else if(cohort_type=="contact"&& contact_type=="other"){
-        base1$exposure_cat4b <-  "Other contacts"
-    }else{
-        base1$exposure_cat4b <- "No contact, non-migrant"
+    if (cohort_type == "contact" && contact_type == "household") {
+        exposure_cat4b <- "Household, smear+"
+    } else if (cohort_type=="contact"&& contact_type == "other"){
+        exposure_cat4b <-  "Other contacts"
+    } else {
+        exposure_cat4b <- "No contact, non-migrant"
         for (i in seq_along(na)) {
             index <- na[[i]]
-            apos<-round(length(index) * highburden)
-            base1$exposure_cat4b[index[seq_len(apos)]] <- "No contact, migrant"
+            apos<-round(sum(index) * highburden)
+            exposure_cat4b[index][seq_len(apos)] <- "No contact, migrant"
         }
-
     }
 
-    base1$months_migrant <- 12
-    base1$hivpos         <- "No"
-    base1$transplant     <- "No"
-    base1$ltbi_treatment <- "No"
-
-    base1 <- select(
-        base1,
-        agespl1, agespl2, agespl3, agespl4,
-        pct_testspl1, pct_testspl2, pct_testspl3, pct_testspl4,
-        exposure_cat4b, months_migrant,
-        hivpos, transplant_assumed = transplant,
-        ltbi_treatment, qfn_result, tspot_result
+    base1 <- data.frame(
+        agespl1 = age, age_spline5,
+        pct_testspl1, pct_test_spline5,
+        exposure_cat4b,
+        months_migrant = 12,
+        hivpos = "No",
+        transplant_assumed = "No",
+        ltbi_treatment = "No",
+        qfn_result, tspot_result
     )
 
-    list(
-        df = base1,
-        npositives = npositives
-    )
+    list(df = base1, npositives = npositives)
 }
