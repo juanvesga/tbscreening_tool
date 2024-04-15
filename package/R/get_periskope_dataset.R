@@ -19,7 +19,14 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
     # create the base1 table
     # Note: now using named characters
     samps_age    <- sort(samps_age) # to match previous version
-    lookage      <- setNames(c(21L, 36L, 56L, 83L), age_cats)
+    lookage      <- c(
+        "16-35" = 21,
+        "36-45" = 36L,
+        "46-65" = 56L,
+        "65+"   = 83L
+    )
+    stopifnot(identical(rownames(age.categorical), names(lookage)))
+
     base1        <- list2DF(list(Age_cat = samps_age, Age = lookage[samps_age]))
 
     base1$result <- "Negative"
