@@ -22,6 +22,7 @@ Imports:
     freedom,
     gridExtra,
     Hmisc,
+    igraph,
     matrixStats,
     reshape2,
     rmarkdown,

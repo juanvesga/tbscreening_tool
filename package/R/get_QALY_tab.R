@@ -38,11 +38,11 @@ get_QALY_tab <- function(r) {
     #     }
     # }
 
-    q.male <- dplyr::rename(q.male, q_male = UK)
-    q.male <- dplyr::mutate(q.male, l_male = l_x_est(q_male, smr))
+    q.male <- rename(q.male, q_male = UK)
+    q.male <- mutate(q.male, l_male = l_x_est(q_male, smr))
 
-    q.female <- dplyr::rename(q.female, q_female = UK)
-    q.female <- dplyr::mutate(q.female, l_female = l_x_est(q_female, smr))
+    q.female <- rename(q.female, q_female = UK)
+    q.female <- mutate(q.female, l_female = l_x_est(q_female, smr))
 
     # Note 1: The stats::filter function used below is the equivalent to the
     #         following in data.table:
@@ -59,9 +59,9 @@ get_QALY_tab <- function(r) {
     #                 for (i in 1:nrow(q.person))
     #                     q.person[i, t_x := sum(q.person$bigl_x[i:nrow(q.person)])]
     #
-    qale <- dplyr::left_join(q.male, q.female, by = "Age")
+    qale <- left_join(q.male, q.female, by = "Age")
 
-    qale <- dplyr::mutate(
+    qale <- mutate(
         qale,
         p.f = l_female / (l_female + l_male),
         l_person = (p.f * l_female) + ((1 - p.f) * l_male),
@@ -70,13 +70,13 @@ get_QALY_tab <- function(r) {
         LE_x = t_x / l_person
     )
 
-    qale <- dplyr::left_join(
-        dplyr::select(qale, Age, l_person, bigl_x, t_x, LE_x),
-        dplyr::select(qol, Age, qol_age = UK),
+    qale <- left_join(
+        select(qale, Age, l_person, bigl_x, t_x, LE_x),
+        select(qol, Age, qol_age = UK),
         by = "Age"
     )
 
-    qale <- dplyr::mutate(
+    qale <- mutate(
         qale,
         z_x = bigl_x * qol_age * qcm,
         t_adj = rev(cumsum(rev(z_x))),
@@ -86,26 +86,26 @@ get_QALY_tab <- function(r) {
     qaly.calc <- qale[c("Age","z_x")]
     nr <- nrow(qaly.calc)
     temp.q <- lapply(seq_len(nr), function(i) qaly.calc[i:nr, ])
-    temp.q <- dplyr::bind_rows(temp.q, .id = "column_label")
-    temp.q <- dplyr::mutate(
+    temp.q <- bind_rows(temp.q, .id = "column_label")
+    temp.q <- mutate(
         temp.q,
         column_label = as.numeric(column_label) - 1,
         b_x = z_x / (1 + r) ^ (Age - column_label),
         index = as.integer(Age <= time_horizon)
     )
 
-    total.b <- dplyr::summarise(
+    total.b <- summarise(
         temp.q,
         bigb_x = sum(b_x),
         bigb_xfoo = sum(b_x[index == 1L]),
         .by = column_label
     )
 
-    cov <- dplyr::left_join(qale, total.b, by = dplyr::join_by(Age == column_label))
-    cov <- dplyr::mutate(cov, dQALY = bigb_xfoo / l_person)
-    age_bands <- dplyr::mutate(age_bands, midpoint = ceiling( (low + high) / 2))
-    cov <- dplyr::inner_join(cov, age_bands, by = dplyr::join_by(Age == midpoint))
-    cov <- dplyr::select(cov, "Age Group" = "Age band", LE = LE_x, QALE = qale_x, dQALY)
+    cov <- left_join(qale, total.b, by = join_by(Age == column_label))
+    cov <- mutate(cov, dQALY = bigb_xfoo / l_person)
+    age_bands <- mutate(age_bands, midpoint = ceiling( (low + high) / 2))
+    cov <- inner_join(cov, age_bands, by = join_by(Age == midpoint))
+    cov <- select(cov, "Age Group" = "Age band", LE = LE_x, QALE = qale_x, dQALY)
 
     list(agetab = cov)
 }

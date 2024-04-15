@@ -356,7 +356,7 @@ get_icer_obj <- function(parameters, perisk, model, qol_LE, c_matrix, n_samples 
     # Cumulative TB cases by age
     logical_matrix_itv <- predictions * tpt_eff# p < predictions*tpt_eff
     tmp                <- list2DF(list(age = base1$agespl1, pred = predictions))
-    sim_cases_age      <- dplyr::summarise(tmp, pred = sum(pred, na.rm = TRUE), .by = age)
+    sim_cases_age      <- summarise(tmp, pred = sum(pred, na.rm = TRUE), .by = age)
 
     # Estimate and add secondary cases
     cases                  <- sim_cases_age$pred

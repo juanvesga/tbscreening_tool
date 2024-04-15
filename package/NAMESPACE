@@ -2,8 +2,8 @@
 
 export(tool)
 import(BCEA)
+import(dplyr)
 import(ggplot2)
-import(igraph)
 import(rstpm2)
 import(shiny)
 import(shinyBS)

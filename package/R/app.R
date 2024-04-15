@@ -7,7 +7,7 @@
 #' @import rstpm2
 #' @import BCEA
 #' @import shinyBS
-#' @import igraph
+#' @import dplyr
 #'
 #' @export
 tool <- function(...) {
@@ -1253,10 +1253,10 @@ tool <- function(...) {
         })
 
         output$country_burden<-renderText({
-            look <- dplyr::left_join(
+            look <- left_join(
                 list2DF(list(country_of_birth=input$country, year_of_entry = 2018)),
                 country_tb_inc,
-                by = dplyr::join_by(country_of_birth, year_of_entry)
+                by = join_by(country_of_birth, year_of_entry)
             )
             paste(look$e_inc_100k, " per 100k")
         })
@@ -1340,7 +1340,7 @@ tool <- function(...) {
             )
 
             # create the network object
-            network <- graph_from_data_frame(d=links, directed=T)
+            network <- igraph::graph_from_data_frame(d=links, directed=T)
 
             # plot it
             plot(network,
@@ -2680,7 +2680,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls*cohort_size,qtls_low*cohort_size,qtls_high*cohort_size)
+            df<- bind_cols(qtls*cohort_size,qtls_low*cohort_size,qtls_high*cohort_size)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2711,7 +2711,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_high_itv),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2743,7 +2743,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$casesaverted_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2794,7 +2794,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_cost_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2825,7 +2825,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_cost_high_itv),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2857,7 +2857,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$costsaved_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 

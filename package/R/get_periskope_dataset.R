@@ -49,9 +49,9 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
     }
 
     # Impute result from qualitative result
-    base1 <- dplyr::mutate(
+    base1 <- mutate(
         base1,
-        pct_testspl1 = dplyr::case_when(
+        pct_testspl1 = case_when(
             !is.na(pct_qfn)                       ~ as.integer(pct_qfn),
             !is.na(pct_tspot)                     ~ as.integer(pct_tspot),
             qfn_result == "Positive"              ~ 87L,
@@ -75,7 +75,7 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
     base1 <- cbind(base1,pct_test_spline5)
 
     ## Age splines (5 knots at fixed positions)
-    base1       <- dplyr::rename(base1, agespl1 = Age)
+    base1       <- rename(base1, agespl1 = Age)
     age_spline5 <- as.data.frame(
         Hmisc::rcspline.eval(
             base1$agespl1,
@@ -110,7 +110,7 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
     base1$transplant     <- "No"
     base1$ltbi_treatment <- "No"
 
-    base1 <- dplyr::select(
+    base1 <- select(
         base1,
         agespl1, agespl2, agespl3, agespl4,
         pct_testspl1, pct_testspl2, pct_testspl3, pct_testspl4,
