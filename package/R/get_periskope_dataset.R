@@ -1,149 +1,100 @@
 get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
 
-    cohort_size<-data$cohort_size
-    test<-data$test
+    cohort_size  <- data$cohort_size
+    test         <- data$test
+    cohort_type  <- data$cohort_mode
+    highburden   <- data$burden_100k
+    contact_type <- data$contact_type
+    time_horizon <- data$t_hor
+    prev         <- prevalence_tab[,1]/100
 
-    cohort_type<-data$cohort_mode
-    highburden<-data$burden_100k
-    contact_type<-data$contact_type
+    # Sample from categorical distribution of age UK
+    # Note: This used to be age.categorical (made from age_uk) in original app
+    age_cats     <- rownames(age.categorical)
+    probs        <- c(age.categorical) / sum(age.categorical)
 
+    # TODO - How do you want to handle the randomness? TT
+    samps_age    <- sample(x = age_cats, size = cohort_size, prob = probs, replace = TRUE)
 
-    #country <- data$country
-    time_horizon<-data$t_hor
+    # create the base1 table
+    # Note: now using named characters
+    samps_age    <- sort(samps_age) # to match previous version
+    lookage      <- c(
+        "16-35" = 21,
+        "36-45" = 36L,
+        "46-65" = 56L,
+        "65+"   = 83L
+    )
 
-    prev<-prevalence_tab[,1]/100
-
-    # Global
-    lookage <- read.table(header = TRUE,
-                          stringsAsFactors = FALSE,
-                          text="Age_cat Age
-  16-35         21
-  36-45         36
-  46-65         56
-  65+         83")
-
-    # Sample from categorical distribution
-    samps_age<-distributions3::random(age.categorical, cohort_size)
-
-    largetable <- data.frame(
-        Age_cat = samps_age,
-        stringsAsFactors = FALSE)
-
-    base1 <- (merge(largetable,lookage,  by = 'Age_cat'))
-    base1$result<-"Negative"
-
-    na1<-which(base1$Age_cat=="16-35")
-    na2<-which(base1$Age_cat=="36-45")
-    na3<-which(base1$Age_cat=="46-65")
-    na4<-which(base1$Age_cat=="65+")
-
-    a1pos<-round(length(na1)*prev[1])
-    base1$result[na1[1:a1pos]]<-"Positive"
-
-    a2pos<-round(length(na2)*prev[2])
-    base1$result[na2[1:a2pos]]<-"Positive"
-
-    a3pos<-round(length(na3)*prev[3])
-    base1$result[na3[1:a3pos]]<-"Positive"
-
-    a4pos<-round(length(na4)*prev[4])
-    base1$result[na4[1:a4pos]]<-"Positive"
-
-    npositives<-length(which(base1$result=="Positive"))
-
-
+    age <- lookage[samps_age]
+    result <- rep("Negative", times = cohort_size)
+    na <- vector("list", length(age_cats))
+    for (i in seq_along(age_cats)) {
+        index <- samps_age == age_cats[[i]]
+        apos <- round(sum(index) * prev[[i]])
+        result[index][seq_len(apos)] <- "Positive"
+        na[[i]] <- index
+    }
+    npositives <- sum(result == "Positive")
 
     # Results
-    base1$pct_qfn <-NA
-    base1$pct_tspot <- NA
-    base1$pct_tst <- NA
-    base1$qfn_result <-NA
-    base1$tspot_result <- NA
-    base1$tst_result <- NA
-
-    if(test=="QuantiFERON"){
-        base1$qfn_result <-base1$result
-    }else if(test=="T-SPOT.TB"){
-        base1$tspot_result <-base1$result
-
-    }else{
-        base1$tst_result <-base1$result
-
+    if(test == "QuantiFERON") {
+        qfn_result <- result
+        tspot_result <- rep(NA_character_, times = cohort_size)
+    } else if (test == "T-SPOT.TB") {
+        tspot_result <- result
+        qfn_result <- rep(NA_character_, times = cohort_size)
     }
+
     # Impute result from qualitative result
-    base1 <- base1 %>% dplyr::mutate(pct_testspl1 = dplyr::case_when(!is.na(pct_qfn) ~ as.integer(pct_qfn),
-                                                       !is.na(pct_tspot) ~ as.integer(pct_tspot),
-                                                       qfn_result=="Positive" ~ as.integer(87),
-                                                       qfn_result=="Negative" ~ as.integer(1),
-                                                       tspot_result=="Positive" ~ as.integer(87),
-                                                       tspot_result=="Borderline positive" ~ as.integer(79),
-                                                       tspot_result=="Borderline negative" ~ as.integer(76),
-                                                       tspot_result=="Negative" ~ as.integer(1),
-                                                       !is.na(pct_tst) ~ as.integer(pct_tst)))
+    pct_testspl1 <- case_when(
+        qfn_result == "Positive"              ~ 87L,
+        qfn_result == "Negative"              ~ 1L,
+        tspot_result == "Positive"            ~ 87L,
+        tspot_result == "Negative"            ~ 1L
+    )
 
     ### Add test result splines (5 knots at fixed positions)
-    pct_test_spline5 <- as.data.frame(Hmisc::rcspline.eval(base1$pct_testspl1, knots = c(5, 27.5, 50, 72.5, 95)))
+    pct_test_spline5 <- as.data.frame(
+        Hmisc::rcspline.eval(pct_testspl1, knots = c(5, 27.5, 50, 72.5, 95))
+    )
     colnames(pct_test_spline5) <- c("pct_testspl2", "pct_testspl3", "pct_testspl4")
-    base1 <- data.frame(base1,pct_test_spline5)
 
     ## Age splines (5 knots at fixed positions)
-    base1 <- base1 %>% dplyr::rename(agespl1=Age)
-    age_spline5 <- as.data.frame(Hmisc::rcspline.eval(base1$agespl1, knots = c(8, 25, 33.07, 45, 64)))
+    age_spline5 <- as.data.frame(
+        Hmisc::rcspline.eval(age, knots = c(8, 25, 33.07, 45, 64))
+    )
     colnames(age_spline5) <- c("agespl2", "agespl3", "agespl4")
-    base1 <- data.frame(base1,age_spline5)
-
-
 
     # Status
-    base1$contact<-if(cohort_type=="contact"){ "Yes" }else{ "No"}
-    base1$indexcase_proximity<-if(cohort_type=="contact")
-    { contact_type }else{ "Not applicable"}
-    base1$migrant<-if(cohort_type=="new"){ "Yes" }else{ "No"}
-
-
-
+    contact <- if (cohort_type=="contact") "Yes" else "No"
+    indexcase_proximity <- if (cohort_type == "contact") contact_type else "Not applicable"
+    migrant <- if (cohort_type == "new") "Yes" else "No"
 
     # Exposure category
-
-    if(cohort_type=="contact"&& contact_type=="household"){
-
-        base1$exposure_cat4b <- "Household, smear+"
-
-    } else if(cohort_type=="contact"&& contact_type=="other"){
-
-        base1$exposure_cat4b <-  "Other contacts"
-    }else{
-
-        base1$exposure_cat4b <- "No contact, non-migrant"
-
-        a1pos<-round(length(na1)*highburden)
-        base1$exposure_cat4b[na1[1:a1pos]]<-"No contact, migrant"
-
-        a2pos<-round(length(na2)*highburden)
-        base1$exposure_cat4b[na2[1:a2pos]]<-"No contact, migrant"
-
-        a3pos<-round(length(na3)*highburden)
-        base1$exposure_cat4b[na3[1:a3pos]]<-"No contact, migrant"
-
-        a4pos<-round(length(na4)*highburden)
-        base1$exposure_cat4b[na4[1:a4pos]]<-"No contact, migrant"
-
+    if (cohort_type == "contact" && contact_type == "household") {
+        exposure_cat4b <- "Household, smear+"
+    } else if (cohort_type=="contact"&& contact_type == "other"){
+        exposure_cat4b <-  "Other contacts"
+    } else {
+        exposure_cat4b <- "No contact, non-migrant"
+        for (i in seq_along(na)) {
+            index <- na[[i]]
+            apos<-round(sum(index) * highburden)
+            exposure_cat4b[index][seq_len(apos)] <- "No contact, migrant"
+        }
     }
 
-    base1$months_migrant<-12
-    base1$hivpos <- "No"
-    base1$transplant<-"No"
-    base1$ltbi_treatment<-"No"
+    base1 <- data.frame(
+        agespl1 = age, age_spline5,
+        pct_testspl1, pct_test_spline5,
+        exposure_cat4b,
+        months_migrant = 12,
+        hivpos = "No",
+        transplant_assumed = "No",
+        ltbi_treatment = "No",
+        qfn_result, tspot_result
+    )
 
-    base1 <- base1 %>% dplyr::select(agespl1, agespl2, agespl3, agespl4,
-                              pct_testspl1, pct_testspl2, pct_testspl3, pct_testspl4,
-                              exposure_cat4b, months_migrant,
-                              hivpos, transplant,
-                              ltbi_treatment, qfn_result, tspot_result) %>%
-        dplyr::rename(transplant_assumed=transplant)
-
-    res<-list()
-    res$df=base1
-    res$npositives=npositives
-    return(res)
+    list(df = base1, npositives = npositives)
 }

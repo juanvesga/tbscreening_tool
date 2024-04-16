@@ -3,24 +3,23 @@
 #' @import shiny
 #' @import shinydashboard
 #' @import waiter
-#' @import data.table
-#' @import DT
 #' @import ggplot2
 #' @import rstpm2
 #' @import BCEA
 #' @import shinyBS
-#' @import igraph
-#' @import socialmixr
+#' @import dplyr
 #'
 #' @export
 tool <- function(...) {
 
-    # internal data available on load:
-    #   model
-    #   country_tb_inc
-    #   qaly_input
-    #   batch_temp
-    #   dictionary
+    # The following objects are constructed in data-raw/DATASET.R and made
+    # available on load:
+    #     - model
+    #     - country_tb_inc
+    #     - qaly_input
+    #     - batch_temp
+    #     - dictionary
+    #     - c_matrix (contact matrix)
 
     tests <- c("QuantiFERON", "T-SPOT.TB", "Tuberculin Skin Test")
 
@@ -33,16 +32,12 @@ tool <- function(...) {
         "65+"   = 22
     ))
 
-    age.categorical <- distributions3::Categorical(rownames(age_uk), p = age_uk/100)
-
     prev_uk <- as.matrix(c(
         "16-35" = 10,
         "36-45" = 25,
         "46-65" = 35,
         "65+"   = 45
     ))
-
-    qaly_input <- lapply(qaly_input, setDT)
 
     qol_full <- as.matrix(c(
         "A_16to35" = 0.94,
@@ -53,24 +48,6 @@ tool <- function(...) {
 
 
     # -------------------------------------------------------------------------
-    # TODO - build this contact matrix section as internal data
-
-    # Contact matrices for estimating secondary cases
-    ages   <-  c(15,35,45,65,85) # Upper end of age bands
-    age.categories <- as.factor(ages)
-    data(polymod, package = "socialmixr") # POLYMOD for all other contacts
-
-    contact = contact_matrix(
-        polymod, countries = "United Kingdom",
-        age.limits = c(0,as.numeric(as.character(age.categories[1:(length(ages)-1)]))),
-        symmetric = TRUE)
-
-    # normalised matrix
-    c_matrix<-contact$matrix[c(2:5),c(2:5)]/rowSums(contact$matrix[c(2:5),c(2:5)])
-    # -------------------------------------------------------------------------
-
-
-
     ui <- dashboardPage(
 
         skin = "black",
@@ -1276,10 +1253,10 @@ tool <- function(...) {
         })
 
         output$country_burden<-renderText({
-            look <- dplyr::left_join(
+            look <- left_join(
                 list2DF(list(country_of_birth=input$country, year_of_entry = 2018)),
                 country_tb_inc,
-                by = dplyr::join_by(country_of_birth, year_of_entry)
+                by = join_by(country_of_birth, year_of_entry)
             )
             paste(look$e_inc_100k, " per 100k")
         })
@@ -1309,7 +1286,7 @@ tool <- function(...) {
 
 
         #output the datatable based on the dataframe (and make it editable)
-        output$my_datatable <- renderDT(
+        output$my_datatable <- DT::renderDT(
             DT::datatable(
                 v$data,
                 editable = TRUE,
@@ -1363,7 +1340,7 @@ tool <- function(...) {
             )
 
             # create the network object
-            network <- graph_from_data_frame(d=links, directed=T)
+            network <- igraph::graph_from_data_frame(d=links, directed=T)
 
             # plot it
             plot(network,
@@ -1875,7 +1852,7 @@ tool <- function(...) {
 
         QoLmodel <- eventReactive(xxchange(), {
             parameters<-pars()
-            get_QALY_tab(parameters,qaly_input)
+            get_QALY_tab(parameters$dr)
 
         })
 
@@ -1886,7 +1863,7 @@ tool <- function(...) {
 
             #Call necessary objects
             parameters<-pars()
-            perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
+            perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age_uk)
 
             qol_loss_LE<- QoLmodel()$agetab$dQALY
             get_icer_obj(parameters,perisk,model,qol_loss_LE, c_matrix)
@@ -1933,7 +1910,7 @@ tool <- function(...) {
                       params$new_cases <-sim_range[ii]
                     }
 
-                    perisk<-get_periskope_dataset(params,prevalence_tab$data,age.categorical)
+                    perisk<-get_periskope_dataset(params,prevalence_tab$data,age_uk)
 
                     qol_loss_LE<- QoLmodel()$agetab$dQALY
 
@@ -1975,7 +1952,7 @@ tool <- function(...) {
 
             }
 
-            perisk<-get_periskope_dataset(params,prevalence_tab$data,age.categorical)
+            perisk<-get_periskope_dataset(params,prevalence_tab$data,age_uk)
 
             qol_loss_LE<- QoLmodel()$agetab$dQALY
 
@@ -2137,10 +2114,7 @@ tool <- function(...) {
             output$plot_INB <- renderPlot({
                 # req(input$will_to_pay)
                 df<-icer_object()$INB
-                t<-input$t_hor
-                icer<-mean(icer_object()$ICER[,t])
-
-
+                icer<-mean(icer_object()$ICER)
 
                 p <- ggplot(data = df, aes(x = x)) +
                     geom_ribbon(aes(ymin = `2.5%`, ymax = `97.5%`), fill ='darkorange', alpha = 0.2) +
@@ -2399,7 +2373,7 @@ tool <- function(...) {
 
                 df<-obj$INB
                 t<-input$t_hor
-                icer<-mean(obj$ICER[,t])
+                icer<-mean(obj$ICER)
 
 
 
@@ -2638,8 +2612,8 @@ tool <- function(...) {
                     incProgressWaitress(1)
 
                     parameters<-df[ii,]
-                    perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age.categorical)
-                    qol_loss_LE<-get_QALY_tab(parameters,qaly_input)
+                    perisk<-get_periskope_dataset(parameters,prevalence_tab$data,age_uk)
+                    qol_loss_LE<-get_QALY_tab(parameters$dr)
                     res<-get_icer_obj(parameters,perisk,model,qol_loss_LE$agetab$dQALY,c_matrix)
 
                     obj<-res$bcea_tb
@@ -2706,7 +2680,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls*cohort_size,qtls_low*cohort_size,qtls_high*cohort_size)
+            df<- bind_cols(qtls*cohort_size,qtls_low*cohort_size,qtls_high*cohort_size)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2737,7 +2711,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_high_itv),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2769,7 +2743,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$casesaverted_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2820,7 +2794,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_cost_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2851,7 +2825,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$predictions_cost_high_itv),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
@@ -2883,7 +2857,7 @@ tool <- function(...) {
                 matrixStats::rowQuantiles(t(pred$costsaved_high),
                              probs = c(0.5)))
 
-            df<- dplyr::bind_cols(qtls,qtls_low,qtls_high)
+            df<- bind_cols(qtls,qtls_low,qtls_high)
             colnames(df)<-paste(c("mean","low","high"))
             df$x<-1:time_horizon
 
