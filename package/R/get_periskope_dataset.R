@@ -38,12 +38,11 @@ get_periskope_dataset<-function(data, prevalence_tab, age.categorical){
     npositives <- sum(result == "Positive")
 
     # Results
+    tspot_result <- qfn_result <- rep(NA_character_, times = cohort_size)
     if(test == "QuantiFERON") {
         qfn_result <- result
-        tspot_result <- rep(NA_character_, times = cohort_size)
     } else if (test == "T-SPOT.TB") {
         tspot_result <- result
-        qfn_result <- rep(NA_character_, times = cohort_size)
     }
 
     # Impute result from qualitative result
